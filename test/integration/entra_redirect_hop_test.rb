@@ -107,6 +107,58 @@ class EntraRedirectHopTest < ActionDispatch::IntegrationTest
     assert_not Session.home.exists?(user: User.where(email: "hop.user@tourpaq.com"))
   end
 
+  test "two sign-ins started in one browser: Entra's answer to the FIRST still signs in" do
+    with_auth_config(entra_redirect_uri: HOP) do
+      start_sign_in
+      first = FakeEntra.authorization
+      start_sign_in # e.g. the auto-submitted page plus a click, or a second tab
+      assert_not_equal first["state"], FakeEntra.authorization["state"]
+      FakeEntra.authorization = first # Entra completes the first attempt (its PKCE challenge and nonce)
+      forwarded_callback(state: first["state"])
+    end
+    assert_redirected_to "/"
+    assert User.find_by_email("hop.user@tourpaq.com")
+    assert_equal "auth.login", AuditEvent.last.action
+  end
+
+  test "two sign-ins started in one browser: the answer to the second signs in too" do
+    with_auth_config(entra_redirect_uri: HOP) do
+      start_sign_in
+      start_sign_in
+      forwarded_callback
+    end
+    assert_redirected_to "/"
+  end
+
+  test "an attempt is used once: the same answer again is refused" do
+    with_auth_config(entra_redirect_uri: HOP) do
+      start_sign_in
+      start_sign_in
+      second = FakeEntra.authorization
+      forwarded_callback
+      assert_redirected_to "/"
+      FakeEntra.authorization = second
+      forwarded_callback(state: second["state"])
+    end
+    assert_response :forbidden
+    event = AuditEvent.last
+    assert_equal [ "auth.login_refused", "csrf_detected" ], [ event.action, event.data["reason"] ]
+  end
+
+  test "the audit log says why a state did not match" do
+    with_auth_config(entra_redirect_uri: HOP) do
+      start_sign_in
+      forwarded_callback(state: "tpa.#{SecureRandom.hex(24)}")
+      assert_equal "unknown_state", AuditEvent.last.data["state_check"]
+
+      state = FakeEntra.authorization["state"]
+      reset!
+      on_auth_host!
+      forwarded_callback(state: state)
+      assert_equal "no_session_cookie", AuditEvent.last.data["state_check"]
+    end
+  end
+
   test "a state with the right prefix but the wrong random part is refused" do
     with_auth_config(entra_redirect_uri: HOP) do
       start_sign_in

@@ -166,7 +166,7 @@ Rehearse it into a local SQLite auth app (never a local Postgres, §24.4).
 
 1. The **Tourpaq App Platform** stack (`../Tourpaq-App-Platform`) must be deployed first: it owns the
    `tourpaq-platform` network and the production PostgreSQL.
-2. Create the database there: `bin/create-app tourpaq_auth`. It prints the `DATABASE_URL` (host `postgres`). That
+2. Create the database there: copy `bin/create-database` to the server and run `bash create-database` (details in [docs/live-entra-test.md](docs/live-entra-test.md), step 1). It prints the `DATABASE_URL` (host `postgres`). That
    is the only database: the job queue tables live in it too.
 3. DNS for the three host names, and the NetBird rules (admin.app limited to the admins).
 4. Deploy this repo in Coolify as a Docker Compose resource. Put **all three domains on the one `web` service**

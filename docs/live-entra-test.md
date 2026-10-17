@@ -27,11 +27,41 @@ If it says 2.x, stop here: update the proxy in Coolify (Servers → Proxy) first
 
 ## 1. Database
 
-On the platform host:
+The auth app gets its own role and database, `tourpaq_auth`, on the Tourpaq App Platform's Postgres. The platform
+stack must already be deployed on the server, since it owns the Postgres container and the `tourpaq-platform` network.
+
+`bin/create-database` in this repo is self-contained: copy it to the Coolify server and run it there. It finds the
+platform's Postgres container (the compose service labelled `postgres`, a label Coolify keeps), creates the role and
+database with the platform's isolation rules, tests that isolation, and prints the `DATABASE_URL`:
 
 ```sh
-bin/create-app tourpaq_auth        # in ../Tourpaq-App-Platform; prints DATABASE_URL (host "postgres")
+scp bin/create-database <server>:
+ssh <server>
+bash create-database                   # finds the Postgres container itself
+bash create-database <container>       # or name it, if it finds none or several (docker ps | grep postgres)
 ```
+
+It prints:
+
+```
+DATABASE_URL=postgres://tourpaq_auth:<password>@postgres:5432/tourpaq_auth
+```
+
+**The password is shown once and stored nowhere else**, so paste it straight into the Coolify resource's
+environment (step 3). If it is lost: `docker exec -it <container> psql -U postgres -c "ALTER ROLE tourpaq_auth PASSWORD '<new>'"`.
+
+- The script refuses to touch an existing `tourpaq_auth`. To start over, drop both first
+  (`DROP DATABASE tourpaq_auth; DROP ROLE tourpaq_auth;`).
+- Exit code 2 with a warning means the database works, but the server has not been hardened. The warning prints the
+  three commands that fix it.
+- There is nothing else to create. Rails makes the tables, including Solid Queue's, on the first deploy
+  (`bin/docker-entrypoint` runs `db:prepare` and the seeds).
+- The `host` in the URL is `postgres`, the compose service name on the `tourpaq-platform` network, which
+  `docker-compose.yaml` joins. It is not a DNS name.
+
+(From a checkout of `../Tourpaq-App-Platform` on the server, `bin/create-app tourpaq_auth` does the same. It only
+works where that checkout's `docker compose` can see the platform's running project, which is usually not the case
+when Coolify deployed the platform.)
 
 ## 2. Repository
 
@@ -100,6 +130,27 @@ two labels.
 
 To try an app against the live auth app, create its secret in admin.app (Apps → the app → Clients → new secret) and
 set `LOGIN_ISSUER=https://auth.app.journeybooking.eu`, `LOGIN_CLIENT_ID`, `LOGIN_CLIENT_SECRET` in that app.
+
+## If sign-in fails
+
+- **`bad URI (is not URI?): "https://login.microsoftonline.com/<tenant>\"/oauth2/…"`**: a quote is pasted around
+  `ENTRA_TENANT_ID` in Coolify. Enter the bare values, with no quotes or spaces, and redeploy. The app now refuses
+  to start with a message naming the variable when a tenant id, client id or secret is wrapped like that.
+- **`csrf_detected`**: Microsoft's answer reached auth.app (so the hop works), but the browser's session did not hold
+  that sign-in attempt. admin.app → Audit → the `auth.login_refused` event's `state_check` says which case it was:
+  - `no_session_cookie`: the browser sent no `_tourpaq_auth` cookie. It was blocked or the browser changed, or
+    `SECRET_KEY_BASE` changed between starting and finishing, e.g. through a redeploy.
+  - `no_attempt_in_session`: the session holds no attempt. The sign-in was started more than 15 minutes earlier, or
+    in another browser.
+  - `unknown_state`: other attempts are pending, but not this one.
+
+  Before 17 Oct, a second start in the same browser overwrote the first (the auto-submitted page plus a click, or
+  two tabs). The auth app now keeps the last three attempts, each usable once.
+- **`invalid_client` / `AADSTS7000215`**: the client secret is wrong. Use the secret's *Value*, not its *Secret ID*.
+- **`AADSTS50011` (redirect URI mismatch)**: `ENTRA_REDIRECT_URI` is not exactly
+  `https://home.app.journeybooking.eu/auth/entra_id/callback`.
+- **Back on home.app with a Dashboard error instead of auth.app**: the Traefik rule did not match. Repeat the `curl`
+  checks in step 5.
 
 ## Rolling back
 

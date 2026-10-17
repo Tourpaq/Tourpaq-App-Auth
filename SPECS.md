@@ -51,7 +51,7 @@ extension in `clients/index-extension` signing in through auth.app, and the expo
 | Personal API/MCP tokens | Issued, listed and revoked **here**. **One app per token**, with a scope from **that app's own scope list** (default `read` / `read_write`; the Dashboard's is `public` / `all`, §23.3). The user picks the lifetime (30, 90 or 365 days, default 90; at most a year). Apps validate a token by calling the auth app (§9). The effective right is the token's scope capped by the user's *current* role in that app |
 | Extension credentials | The extension signs in through the auth app and receives an access token for its app plus a rotating refresh token. The app validates that token through the auth app, like a personal token (§10) |
 | Stack | Rails 8.1 / Ruby 4.0.7, Hotwire + importmap, plain CSS, Minitest, `bin/docker-dev`. Same conventions and look as the Logs Analyzer, IRM and Azure Cost (dark sidebar, no CSS framework) |
-| Database | **SQLite only on developer machines** (development, tests, rehearsals; §24.4). In production the Tourpaq App Platform Postgres via `DATABASE_URL` on the `tourpaq-platform` network: **one database**, `bin/create-app tourpaq_auth`. Solid Queue tables live in it too. Postgres is checked in CI, never locally |
+| Database | **SQLite only on developer machines** (development, tests, rehearsals; §24.4). In production the Tourpaq App Platform Postgres via `DATABASE_URL` on the `tourpaq-platform` network: **one database**, `tourpaq_auth`, created with `bin/create-database` on the server (or the platform's `bin/create-app tourpaq_auth`). Solid Queue tables live in it too. Postgres is checked in CI, never locally |
 | Hosting | Hetzner via Coolify, Docker Compose resource, port **3050** (Azure Cost 3010, Logs Analyzer 3020, IRM 3030, KPI 3040). **Behind NetBird**, like every app: reachable for everybody on NetBird, which includes the customers and contracted developers who need access (§24.1). Apps on the same Docker network may reach the back-channel through `AUTH_INTERNAL_HOSTS` |
 
 ---
@@ -940,7 +940,7 @@ Every app: `LOGIN_ISSUER=https://auth.app.journeybooking.eu`, its `LOGIN_CLIENT_
 
 - **Dashboard** (in production, **stays at home.app.journeybooking.eu**, §24.1): see §23, and the Entra callback
   forward of §24.2 (`GET /auth/entra_id/callback` → `AUTH_ENTRA_CALLBACK_URL`).
-- **Tourpaq App Platform**: `bin/create-app tourpaq_auth`.
+- **Tourpaq App Platform**: the `tourpaq_auth` role and database, created with this repo's `bin/create-database` on the server (docs/live-entra-test.md, step 1).
 - **Tourpaq-App-WWW** (the index at www.app): its content is exported (`script/index_export.rb`, run on the deployed
   version) and imported into the auth app's index (§24.3), then www.app redirects to index.app and WWW is retired. Its
   round-1 SSO switch is kept in a git stash ("round-1 SSO switch (superseded by the index merge, SPECS §24.3)"); its

@@ -17,7 +17,11 @@ class OmniauthCallbacksController < ApplicationController
     error = request.env["omniauth.error"]
     type = request.env["omniauth.error.type"] || params[:message]
     reason = error.respond_to?(:error_reason) && error.error_reason.present? ? error.error_reason : error&.message
-    AuditEvent.record("auth.login_refused", actor: nil, data: { reason: type.to_s, detail: reason.to_s.truncate(300) }.compact_blank)
+    # state_check (set by the strategy's callback): for csrf_detected, whether the browser sent no session cookie,
+    # had no sign-in attempt in it, or only attempts with other states.
+    AuditEvent.record("auth.login_refused", actor: nil,
+                      data: { reason: type.to_s, detail: reason.to_s.truncate(300),
+                              state_check: request.env["tpa.entra.state_check"] }.compact_blank)
     @message = type.to_s == "invalid_id_token" && reason.to_s.include?("tenant") ? EntraSignIn::MESSAGES[:wrong_tenant] : "The sign-in with Microsoft did not complete (#{type}). Try again."
     render "sessions/refused", status: :forbidden
   end

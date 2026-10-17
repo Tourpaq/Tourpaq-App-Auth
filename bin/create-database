@@ -1,0 +1,125 @@
+#!/usr/bin/env bash
+#
+# Create the auth app's PostgreSQL role and database on the platform Postgres, and
+# PROVE they are isolated. Run it once, on the Coolify server, before the first
+# deploy. Self-contained: copy just this file to the server and run it.
+#
+#   scp bin/create-database <server>:
+#   ssh <server>
+#   bash create-database                 # finds the Postgres container itself
+#   bash create-database <container>     # or name it (docker ps | grep postgres)
+#
+# Prints the DATABASE_URL to paste into the app's Coolify environment. The
+# password is generated here and shown ONCE; it is stored nowhere else.
+#
+# The rules are the Tourpaq App Platform's (its sql/create-app.sql), copied here
+# so this app carries its own setup:
+#   - a login role with no extra powers: it cannot create databases or roles;
+#   - a database owned by that role, with CONNECT revoked from everyone else,
+#     so other apps on the shared server cannot even see its schema;
+#   - the public schema locked to the role, as a second barrier.
+# Rails migrations then create the tables inside it on every deploy.
+#
+# Settings (environment variables):
+#   APP_NAME        role and database name   (default: tourpaq_auth)
+#   PG_SUPERUSER    the server's superuser   (default: postgres)
+set -euo pipefail
+
+app="${APP_NAME:-tourpaq_auth}"
+superuser="${PG_SUPERUSER:-postgres}"
+
+die() { echo "error: $*" >&2; exit 1; }
+
+[[ "$app" =~ ^[a-z][a-z0-9_]*$ ]] || die "'$app' is not a valid name (lowercase letters, digits, underscore)"
+command -v docker >/dev/null || die "docker is not available on this machine"
+
+# ---- Find the Postgres container --------------------------------------------
+container="${1:-}"
+if [[ -z "$container" ]]; then
+  # The platform's compose service is called "postgres"; Coolify keeps that label.
+  found=$(docker ps --filter "label=com.docker.compose.service=postgres" --format '{{.Names}}')
+  count=$(printf '%s' "$found" | grep -c . || true)
+  if [[ "$count" -ne 1 ]]; then
+    echo "Could not pick the Postgres container automatically (found $count). Running Postgres containers:" >&2
+    docker ps --format '  {{.Names}}\t{{.Image}}' | grep -i postgres >&2 || echo "  (none)" >&2
+    die "name it: bash create-database <container>"
+  fi
+  container="$found"
+fi
+docker inspect "$container" >/dev/null 2>&1 || die "no container named '$container'"
+echo "Postgres container: $container"
+
+# psql as the superuser over the container's local socket. `< /dev/null` stops
+# docker exec from draining this script's stdin.
+psql_super() { docker exec -i "$container" psql -U "$superuser" -v ON_ERROR_STOP=1 -X -q "$@"; }
+
+# ---- Refuse rather than half-create -----------------------------------------
+role_exists=$(psql_super -tAc "SELECT 1 FROM pg_roles WHERE rolname = '$app'" < /dev/null)
+db_exists=$(psql_super -tAc "SELECT 1 FROM pg_database WHERE datname = '$app'" < /dev/null)
+if [[ -n "$role_exists" || -n "$db_exists" ]]; then
+  echo "'$app' already exists on this server:" >&2
+  [[ -n "$role_exists" ]] && echo "  role     $app" >&2
+  [[ -n "$db_exists" ]] && echo "  database $app" >&2
+  die "nothing changed. To start over, drop both first (DROP DATABASE $app; DROP ROLE $app;)"
+fi
+
+# Letters and digits only, so it needs no escaping inside a URL.
+raw=$(LC_ALL=C tr -dc 'A-Za-z0-9' < <(head -c 4096 /dev/urandom))
+password="${raw:0:32}"
+
+# ---- Create ------------------------------------------------------------------
+# No transaction: CREATE DATABASE cannot run inside one. :"x" is a quoted
+# identifier and :'x' a quoted literal; psql does the escaping.
+echo "Creating role and database '$app'..."
+psql_super -v "app_role=$app" -v "app_database=$app" -v "app_password=$password" -f - <<'SQL'
+CREATE ROLE :"app_role" LOGIN PASSWORD :'app_password'
+  NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT;
+
+CREATE DATABASE :"app_database" OWNER :"app_role" ENCODING 'UTF8';
+
+REVOKE CONNECT ON DATABASE :"app_database" FROM PUBLIC;
+GRANT  CONNECT ON DATABASE :"app_database" TO :"app_role";
+
+\connect :"app_database"
+REVOKE ALL ON SCHEMA public FROM PUBLIC;
+GRANT  ALL ON SCHEMA public TO :"app_role";
+ALTER SCHEMA public OWNER TO :"app_role";
+SQL
+
+# ---- Verify: test the isolation, don't trust it ------------------------------
+# Over TCP on purpose: the local socket may use peer authentication, which
+# would pass or fail for reasons that have nothing to do with the grants.
+can_connect() {
+  docker exec -e "PGPASSWORD=$password" "$container" \
+    psql -X -q -U "$app" -h 127.0.0.1 -d "$1" -c 'SELECT 1' >/dev/null 2>&1 < /dev/null
+}
+
+echo "Verifying isolation..."
+can_connect "$app" || die "'$app' cannot connect to its own database. Something is wrong; do not use it."
+
+hardened=yes
+can_connect postgres && hardened=no
+
+echo
+echo "Done. Set this on the app's Coolify resource (Environment Variables):"
+echo
+echo "  DATABASE_URL=postgres://$app:$password@postgres:5432/$app"
+echo
+echo "The password is not stored anywhere else. If it is lost: ALTER ROLE $app PASSWORD '<new>';"
+
+if [[ "$hardened" == no ]]; then
+  cat >&2 <<EOF
+
+WARNING: '$app' can connect to the 'postgres' maintenance database.
+This server has not been hardened: PUBLIC still has CONNECT there, so every app
+role can list every other database and role. That is a server-wide setting, not
+this app's. The platform's sql/harden-server.sql fixes it; by hand:
+
+  docker exec $container psql -U $superuser -v ON_ERROR_STOP=1 -c "REVOKE CONNECT ON DATABASE postgres FROM PUBLIC" -c "REVOKE CONNECT ON DATABASE template1 FROM PUBLIC"
+  docker exec $container psql -U $superuser -v ON_ERROR_STOP=1 -d template1 -c "REVOKE ALL ON SCHEMA public FROM PUBLIC"
+
+The app works either way; run this script again afterwards only if you want
+to see the check pass (drop the role and database first).
+EOF
+  exit 2
+fi

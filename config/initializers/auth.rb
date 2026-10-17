@@ -5,6 +5,7 @@
 # auth.example.com (AUTH, the issuer), index.example.com (INDEX) and admin.example.com (ADMIN), and the
 # back-channel host auth-internal.example.com:3050 stands in for AUTH_INTERNAL_HOSTS.
 require "ipaddr"
+require_relative "../../lib/entra_settings"
 
 Rails.application.config.x.auth = ActiveSupport::OrderedOptions.new.tap do |auth|
   env = Rails.env.test? ? {} : ENV
@@ -49,6 +50,13 @@ Rails.application.config.x.auth = ActiveSupport::OrderedOptions.new.tap do |auth
   # the auth host's own callback. While the registration only has home.app's callback, set it to
   # https://home.app.journeybooking.eu/auth/entra_id/callback: the Dashboard forwards that GET here.
   auth.entra_redirect_uri = env["ENTRA_REDIRECT_URI"].presence || "#{auth.app_url}/auth/entra_id/callback"
+  # A quote or space pasted around a value would otherwise only show at the first sign-in (lib/entra_settings.rb).
+  entra_problems = EntraSettings.problems(tenant_id: env["ENTRA_TENANT_ID"], client_id: env["ENTRA_CLIENT_ID"],
+                                          client_secret: env["ENTRA_CLIENT_SECRET"])
+  if entra_problems.any?
+    raise entra_problems.join("\n") if Rails.env.production? && !building_assets
+    entra_problems.each { warn "[auth] #{_1}" }
+  end
 
   # --- OIDC provider signing keys (SPECS.md §7.3, §14): PEM, "\n" escapes allowed ---
   auth.oidc_signing_key = env["OIDC_SIGNING_KEY"].presence&.gsub("\\n", "\n")

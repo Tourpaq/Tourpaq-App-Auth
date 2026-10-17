@@ -32,6 +32,14 @@ module OmniAuth
 
       STATE_PREFIX = "tpa.".freeze
 
+      # Sign-in attempts still waiting for Entra's answer, newest last: state, PKCE verifier, nonce, started at.
+      # omniauth-oauth2 keeps only ONE state/verifier in the session, so a second start in the same browser (the
+      # auto-submitted sign-in page plus a click, two tabs, Back and again) overwrote the first, and Entra's answer
+      # to the first then failed as csrf_detected. Each attempt is kept here, used at most once, for PENDING_TTL.
+      PENDING_KEY = "entra_pending".freeze
+      PENDING_MAX = 3
+      PENDING_TTL = 15 * 60
+
       def authorize_params
         super.tap do |params|
           # omniauth-oauth2 has just put a random state in params and the session; mark both the same way.
@@ -46,8 +54,50 @@ module OmniAuth
           params[:prompt] = "login" if session[PROMPT_KEY].to_s == "login"
           params[:scope] = options.scope.presence || DEFAULT_SCOPE
           params[:response_mode] = "query"
+          remember_attempt(state, session["omniauth.pkce.verifier"], nonce)
         end
       end
+
+      # Puts the attempt Entra is answering back where omniauth-oauth2 and raw_info look for it; the rest of the
+      # checks (state compared in full, PKCE, nonce, ID token) are unchanged. env["tpa.entra.state_check"] says
+      # which case a failure was, for the audit log.
+      def callback_phase
+        env["tpa.entra.state_check"] = restore_attempt(request.params["state"].to_s)
+        super
+      end
+
+      private
+
+      def remember_attempt(state, verifier, nonce)
+        now = Time.now.to_i
+        pending = pending_attempts(now).last(PENDING_MAX - 1)
+        session[PENDING_KEY] = pending + [ { "s" => state, "v" => verifier, "n" => nonce, "t" => now } ]
+      end
+
+      def restore_attempt(state)
+        pending = pending_attempts(Time.now.to_i)
+        match = state.empty? ? nil : pending.find { |attempt| secure_compare(attempt["s"].to_s, state) }
+        if match
+          session["omniauth.state"] = match["s"]
+          session["omniauth.pkce.verifier"] = match["v"]
+          session[NONCE_KEY] = match["n"]
+          pending.delete(match) # used once
+        else
+          # omniauth-oauth2 compares against this and fails on nil; an empty string fails the compare cleanly as
+          # csrf_detected (e.g. an answer replayed after the session was reset by a successful sign-in).
+          session["omniauth.state"] = session["omniauth.state"].to_s
+        end
+        session[PENDING_KEY] = pending
+        return "matched" if match
+        return "no_session_cookie" unless request.cookies.key?(Rails.application.config.session_options[:key].to_s)
+        pending.any? ? "unknown_state" : "no_attempt_in_session"
+      end
+
+      def pending_attempts(now)
+        Array(session[PENDING_KEY]).select { |attempt| attempt.is_a?(Hash) && now - attempt["t"].to_i < PENDING_TTL }
+      end
+
+      public
 
       # omniauth-oauth2 sends this as redirect_uri in the authorization request (request_phase) and in the
       # token request (build_access_token).
