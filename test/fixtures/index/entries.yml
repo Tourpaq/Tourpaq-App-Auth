@@ -1,0 +1,36 @@
+# salesview: everyone signed in. sql_bravo: in the DK Tech / RO DevOps table section. irm: tied to the auth app IRM.
+salesview:
+  slug: salesview
+  name: Salesview
+  description: Viewing existing and creating new bookings.
+  url: https://salesview.app.journeybooking.eu
+  section: apps
+  access_level: netbird
+  login_method: sso
+  owner: Sam
+  status: beta
+  visibility: everyone
+
+sql_bravo:
+  slug: ms-sql-master-bravo
+  name: MS SQL Master - Bravo
+  description: Primary SQL Server for the Bravo environment.
+  address: sql-bp-we-01.tourpaq.com
+  section: databases
+  access_level: netbird
+  status: live
+  visibility: everyone
+  body: "## Connecting\n\nUse the read-only login."
+
+irm:
+  slug: irm
+  name: IRM
+  description: Incident response, on-call and the status page.
+  url: https://irm.app.journeybooking.eu
+  section: apps
+  app: irm
+  access_level: netbird
+  login_method: sso
+  status: live
+  visibility: everyone
+  position: 5

@@ -1,0 +1,35 @@
+# One database per app, as the Tourpaq App Platform gives it: the app's tables and Solid Queue's
+# job tables live in the same database (Solid Queue's schema is a normal migration here).
+#
+# SQLite files under storage/ by default. In production set DATABASE_URL to the platform's
+# PostgreSQL, e.g. postgres://tourpaq_auth:secret@postgres:5432/tourpaq_auth
+# (created with `bin/create-app tourpaq_auth` in ../Tourpaq-App-Platform).
+default: &default
+  adapter: sqlite3
+  max_connections: <%= ENV.fetch("RAILS_MAX_THREADS") { 5 } %>
+  timeout: 5000
+
+postgres: &postgres
+  adapter: postgresql
+  encoding: unicode
+  # Puma threads plus Solid Queue's own threads (it runs inside Puma: SOLID_QUEUE_IN_PUMA)
+  max_connections: <%= ENV.fetch("DB_POOL") { 15 } %>
+  connect_timeout: 5
+
+development:
+  <<: *default
+  database: storage/development.sqlite3
+
+test:
+  <<: *default
+  # TEST_DB lets several test runs work side by side (e.g. TEST_DB=storage/test_admin.sqlite3).
+  database: <%= ENV.fetch("TEST_DB", "storage/test.sqlite3") %>
+
+production:
+<% if ENV["DATABASE_URL"].to_s.start_with?("postgres") %>
+  <<: *postgres
+  url: <%= ENV["DATABASE_URL"] %>
+<% else %>
+  <<: *default
+  database: storage/production.sqlite3
+<% end %>

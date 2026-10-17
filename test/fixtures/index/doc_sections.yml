@@ -1,0 +1,4 @@
+deployment:
+  key: deployment
+  title: Deployment
+  position: 10

@@ -1,0 +1,22 @@
+<% content_for :title, "Index doc sections" %>
+<%= render "admin/index_content/tabs" %>
+<div class="section-head">
+  <h1>Doc sections</h1>
+  <%= link_to "Add a section", new_admin_index_doc_section_path, class: "button" %>
+</div>
+<p class="muted">Sections are the documentation headings in the index's menu.</p>
+<div class="table-wrap">
+  <table>
+    <thead><tr><th class="num">Order</th><th>Title</th><th>Key (in the URL)</th><th class="num">Docs</th></tr></thead>
+    <tbody>
+      <% @sections.each do |section| %>
+        <tr>
+          <td class="num muted"><%= section.position %></td>
+          <td><%= link_to section.title, edit_admin_index_doc_section_path(section) %></td>
+          <td><code>/docs/<%= section.key %>/…</code></td>
+          <td class="num"><%= section.docs.size %></td>
+        </tr>
+      <% end %>
+    </tbody>
+  </table>
+</div>

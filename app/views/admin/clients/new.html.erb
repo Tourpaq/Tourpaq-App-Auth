@@ -1,0 +1,4 @@
+<% content_for :title, "New client" %>
+<p class="breadcrumb"><%= link_to "Apps", admin_apps_path %> / <%= link_to @app.name, admin_app_path(@app) %></p>
+<h1>New client for <%= @app.name %></h1>
+<%= render "form", app: @app, client: @client %>

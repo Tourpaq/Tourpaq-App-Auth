@@ -1,0 +1,15 @@
+mwi_dk_tech:
+  group: dk_tech
+  user: mwi
+
+jjr_dk_tech:
+  group: dk_tech
+  user: jjr
+
+alice_ro_dev:
+  group: ro_dev
+  user: alice
+
+dave_ro_dev:
+  group: ro_dev
+  user: dave_disabled

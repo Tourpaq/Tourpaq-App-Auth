@@ -1,0 +1,8 @@
+<% content_for :title, "Signed out" %>
+<h1>You are signed out</h1>
+<p>Your Tourpaq sign-in in this browser has ended. You are still signed in to Microsoft.</p>
+<% if @back_url %>
+  <p><%= link_to "Back to #{Oidc::Access.app_name(@client)}", @back_url %></p>
+<% else %>
+  <p><%= link_to "Sign in again", sign_in_path(stay: 1) %></p>
+<% end %>

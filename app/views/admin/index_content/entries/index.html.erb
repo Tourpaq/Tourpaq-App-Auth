@@ -1,0 +1,35 @@
+<% content_for :title, "Index entries" %>
+<%= render "admin/index_content/tabs" %>
+<div class="section-head">
+  <h1>Entries</h1>
+  <%= link_to "Add an entry", new_admin_index_entry_path, class: "button" %>
+</div>
+
+<div data-controller="index-filter">
+  <%= render "index/shared/filter", count: @entries.size %>
+  <% @by_section.each do |section, entries| %>
+    <h2>
+      <%= section&.name || "Not in a section" %>
+      <% if section %><span class="muted small"><%= section.table? ? "table" : "cards" %> · <%= section.visibility_label %></span><% end %>
+    </h2>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th class="num">Order</th><th>Name</th><th>URL / address</th><th>Shown to</th><th>Access</th><th>Status</th><th>Changed</th><th></th></tr></thead>
+        <tbody>
+          <% entries.each do |entry| %>
+            <tr data-index-filter-target="item">
+              <td class="num muted"><%= entry.position %></td>
+              <td><%= link_to entry.name, edit_admin_index_entry_path(entry) %></td>
+              <td class="muted wrap"><%= entry.address || entry.url %></td>
+              <td class="wrap small"><%= entry.visibility_label %></td>
+              <td><%= index_access_pills(entry) %></td>
+              <td><%= index_status_badge(entry) %></td>
+              <td class="muted"><%= index_time_ago(entry.updated_at) %></td>
+              <td class="actions-cell"><%= link_to "View", index_host_url("/apps/#{entry.to_param}"), class: "btn-secondary btn-small" %></td>
+            </tr>
+          <% end %>
+        </tbody>
+      </table>
+    </div>
+  <% end %>
+</div>

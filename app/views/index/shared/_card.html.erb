@@ -1,0 +1,38 @@
+<%# One entry as a card (WWW's apps/_card). An entry tied to an auth app shows the viewer's role in it. %>
+<article class="ix-card" data-index-filter-target="item">
+  <div class="ix-card-head">
+    <%= index_icon(entry) %>
+    <h3 class="ix-card-name"><%= link_to entry.name, index_entry_href(entry) %></h3>
+    <%= index_status_badge(entry) %>
+  </div>
+
+  <p class="ix-card-desc"><%= entry.description %></p>
+  <%= index_role(entry) if entry.app %>
+
+  <% if entry.address.present? %>
+    <p class="ix-address"><code class="ix-copy" data-controller="index-copy" data-index-copy-text-value="<%= entry.address %>"
+      data-action="click->index-copy#copy" title="Click to copy"><%= entry.address %></code></p>
+  <% end %>
+
+  <% if entry.links.any? %>
+    <ul class="ix-link-list">
+      <% entry.links.each do |link| %>
+        <li>
+          <%= link_to link.label, safe_index_href(link.url) %>
+          <% if link.note.present? %><span class="ix-link-note"><%= link.note %></span><% end %>
+        </li>
+      <% end %>
+    </ul>
+  <% end %>
+
+  <%= index_access_pills(entry) %>
+
+  <div class="ix-card-foot">
+    <div class="ix-card-links">
+      <% if entry.url %><%= link_to "Open ↗", safe_index_href(entry.url), class: "ix-btn" %><% end %>
+      <% if entry.page? %><%= link_to "Details", index_entry_path(entry), class: "ix-btn-secondary" %><% end %>
+      <% if entry.repo %><%= link_to "Repo", safe_index_href(entry.repo), class: "ix-btn-secondary" %><% end %>
+    </div>
+    <% if entry.owner %><span class="ix-owner"><%= entry.owner %></span><% end %>
+  </div>
+</article>

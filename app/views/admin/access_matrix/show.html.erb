@@ -1,0 +1,45 @@
+<% content_for :title, "Access matrix" %>
+<div class="section-head">
+  <h1>Access matrix</h1>
+  <div class="actions">
+    <%= link_to "Download CSV", admin_access_matrix_path(format: :csv, with_access: params[:with_access]), class: "btn-secondary" %>
+  </div>
+</div>
+<p class="muted">Each active user's effective role in each active app. Hover a role to see where it comes from.</p>
+
+<%= form_with url: admin_access_matrix_path, method: :get, class: "filters", data: { controller: "submit-on-change" } do |f| %>
+  <div>
+    <label class="check"><%= check_box_tag :with_access, "1", params[:with_access] == "1" %> Only users with access to something</label>
+  </div>
+  <div><%= f.submit "Filter", class: "btn-secondary" %></div>
+<% end %>
+
+<div class="table-wrap">
+  <table class="matrix">
+    <thead>
+      <tr>
+        <th>User</th>
+        <% @apps.each do |app| %><th><%= link_to app.name, members_admin_app_path(app) %></th><% end %>
+      </tr>
+    </thead>
+    <tbody>
+      <% @users.each do |user| %>
+        <tr>
+          <td><%= link_to user.display_name, admin_user_path(user) %><div class="muted small"><%= user.email %></div></td>
+          <% @apps.each do |app| %>
+            <% access = @roles[app.id][user.id] %>
+            <td class="matrix-cell">
+              <% if access %>
+                <span title="<%= access.to_s %>"><%= role_badge(access) %></span>
+                <% unless access.multiple? %><span class="matrix-source"><%= access.direct? ? "direct" : access.source %></span><% end %>
+              <% else %>
+                <span class="muted">—</span>
+              <% end %>
+            </td>
+          <% end %>
+        </tr>
+      <% end %>
+    </tbody>
+  </table>
+</div>
+<p class="muted small"><%= pluralize(@users.size, "user") %> × <%= pluralize(@apps.size, "app") %>.</p>

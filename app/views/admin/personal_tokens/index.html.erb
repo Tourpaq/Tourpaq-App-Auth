@@ -1,0 +1,19 @@
+<% content_for :title, "Tokens" %>
+<h1>Personal tokens</h1>
+<p class="muted">Every user's API and MCP tokens. Users create them on their Tokens page at home; tokens not used for
+  90 days are flagged.</p>
+
+<%= form_with url: admin_tokens_path, method: :get, class: "filters", data: { controller: "submit-on-change" } do |f| %>
+  <div>
+    <%= f.label :state, "Show" %>
+    <%= f.select :state, [ [ "Active", "active" ], [ "Unused for 90 days", "unused" ], [ "Expiring within 7 days", "expiring" ], [ "Revoked", "revoked" ], [ "Expired", "expired" ], [ "All", "all" ] ], selected: @state %>
+  </div>
+  <div>
+    <%= f.label :app_id, "App" %>
+    <%= f.select :app_id, options_from_collection_for_select(@apps, :id, :name, params[:app_id]), include_blank: "Any app" %>
+  </div>
+  <% if params[:user_id].present? %><%= hidden_field_tag :user_id, params[:user_id], id: nil %><% end %>
+  <div><%= f.submit "Filter" %></div>
+<% end %>
+
+<%= render "admin/personal_tokens/table", tokens: @tokens, show_user: true, unused_ids: @unused_ids %>

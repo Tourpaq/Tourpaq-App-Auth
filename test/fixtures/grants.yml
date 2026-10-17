@@ -1,0 +1,14 @@
+dk_tech_irm_admin:
+  app: irm
+  subject: dk_tech (Group)
+  app_role: irm_admin
+
+dk_tech_kpi_admin:
+  app: kpi
+  subject: dk_tech (Group)
+  app_role: kpi_admin
+
+ro_dev_irm_responder:
+  app: irm
+  subject: ro_dev (Group)
+  app_role: irm_responder

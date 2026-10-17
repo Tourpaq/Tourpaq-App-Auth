@@ -1,0 +1,5 @@
+salesview_admin:
+  entry: salesview
+  label: Booking admin
+  url: https://salesview.app.journeybooking.eu/admin
+  position: 0

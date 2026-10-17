@@ -1,0 +1,29 @@
+<% content_for :title, "Groups" %>
+<div class="section-head">
+  <h1>Groups</h1>
+  <%= link_to "New group", new_admin_group_path, class: "button" %>
+</div>
+<p class="muted">Access given to a group applies to all its members. A user's direct grant wins over their groups;
+  otherwise the highest role among their groups counts.</p>
+<% if @groups.empty? %>
+  <p class="empty">No groups.</p>
+<% else %>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Group</th><th class="num">Members</th><th>Access</th></tr></thead>
+      <tbody>
+        <% @groups.each do |group| %>
+          <tr>
+            <td><%= link_to group.name, admin_group_path(group) %><% if group.description.present? %><div class="muted small"><%= group.description %></div><% end %></td>
+            <td class="num"><%= group.users.size %></td>
+            <td class="wrap">
+              <% group.grants.sort_by { _1.app.name }.each do |grant| %>
+                <span class="chip"><%= grant.app.name %> <%= role_badge(grant.app_role) %></span>
+              <% end %>
+            </td>
+          </tr>
+        <% end %>
+      </tbody>
+    </table>
+  </div>
+<% end %>

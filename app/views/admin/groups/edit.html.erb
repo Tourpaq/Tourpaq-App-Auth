@@ -1,0 +1,10 @@
+<% content_for :title, "Edit #{@group.name}" %>
+<h1>Edit <%= @group.name %></h1>
+<%= render "form", group: @group %>
+
+<div class="card danger-zone">
+  <h2>Delete the group</h2>
+  <p class="muted">Its grants are removed (members lose what only this group gave them) and its members stay users.</p>
+  <%= button_to "Delete #{@group.name}", admin_group_path(@group), method: :delete, class: "danger",
+        form: { data: { turbo_confirm: "Delete #{@group.name}? Its #{pluralize(@group.users.count, 'member')} lose the access it gives." } } %>
+</div>

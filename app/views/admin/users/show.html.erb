@@ -1,0 +1,169 @@
+<% content_for :title, @user.display_name %>
+<div class="section-head">
+  <div>
+    <h1><%= @user.display_name %></h1>
+    <p class="muted"><%= @user.email %> <%= user_status_pills(@user) %></p>
+  </div>
+  <div class="actions">
+    <% if @user.active? %>
+      <%= button_to "Sign out everywhere", sign_out_everywhere_admin_user_path(@user), class: "btn-secondary",
+            form: { data: { turbo_confirm: "Sign #{@user.display_name} out of home, the admin host and every extension? The apps end their sessions within 5 minutes. Personal tokens keep working." } } %>
+      <% if @user.admin? %>
+        <%= button_to "Remove admin", remove_admin_admin_user_path(@user), class: "btn-secondary",
+              disabled: @user == current_admin, title: (@user == current_admin ? "You cannot remove your own admin rights" : nil),
+              form: { data: { turbo_confirm: "Remove admin rights from #{@user.display_name}?" } } %>
+      <% else %>
+        <%= button_to "Make admin", make_admin_admin_user_path(@user), class: "btn-secondary",
+              form: { data: { turbo_confirm: "Make #{@user.display_name} an admin of the auth app?" } } %>
+      <% end %>
+      <%= button_to "Disable", disable_admin_user_path(@user), class: "btn-secondary danger", disabled: @user == current_admin,
+            form: { data: { turbo_confirm: "Disable #{@user.display_name}? Their sessions end, extensions are signed out and tokens are refused, at once." } } %>
+    <% else %>
+      <%= button_to "Enable", enable_admin_user_path(@user), class: "button" %>
+    <% end %>
+  </div>
+</div>
+
+<div class="card">
+  <dl class="facts">
+    <dt>Subject (sub)</dt><dd class="mono"><%= @user.sub %></dd>
+    <dt>Entra account</dt><dd><%= @user.bound? ? tag.span(@user.upn.presence || @user.entra_oid, class: "mono") : tag.span("not signed in yet: bound by email at the first sign-in", class: "muted") %></dd>
+    <dt>Created</dt><dd><%= local_time(@user.created_at) %></dd>
+    <dt>Last sign-in</dt><dd><%= local_time(@user.last_login_at) %></dd>
+    <% if @user.disabled? %><dt>Disabled</dt><dd><%= local_time(@user.disabled_at) %></dd><% end %>
+    <% if @user.sessions_valid_after %><dt>Signed out everywhere</dt><dd><%= local_time(@user.sessions_valid_after) %></dd><% end %>
+  </dl>
+</div>
+
+<h2>Access</h2>
+<p class="muted small">The effective role per app and where it comes from. A direct grant wins over the groups,
+  and may also be "no access". Removing the direct grant leaves what the groups give. In apps with several roles per
+  user the direct roles add to the groups' roles, and the resolved permissions show where each comes from.</p>
+<div class="table-wrap">
+  <table class="access-table">
+    <thead><tr><th>App</th><th>Effective role</th><th>Direct grant</th><th>Set direct grant</th></tr></thead>
+    <tbody>
+      <% @apps.each do |app| %>
+        <% access = @access[app.id] %>
+        <% grants = @direct.fetch(app.id, []) %>
+        <tr class="<%= 'row-muted' if app.disabled? %>">
+          <td><%= link_to app.name, admin_app_path(app) %><% if app.disabled? %> <span class="pill pill-muted">app disabled</span><% end %></td>
+          <td>
+            <%= effective_role_label(access) %>
+            <% if app.multiple_roles? && access.access? %><%= permissions_details(access) %><% end %>
+          </td>
+          <td>
+            <% if app.multiple_roles? && grants.any? %>
+              <ul class="chip-list">
+                <% grants.sort_by { _1.app_role&.key.to_s.downcase }.each do |grant| %>
+                  <li class="chip">
+                    <%= role_badge(grant.app_role) %>
+                    <%= button_to "×", admin_grant_path(grant), method: :delete, class: "chip-remove", title: "Remove #{grant.app_role&.key || 'no access'}",
+                          form: { data: { turbo_confirm: "Remove the direct grant of #{grant.app_role&.key || 'no access'} in #{app.name} from #{@user.display_name}?" } } %>
+                  </li>
+                <% end %>
+              </ul>
+            <% elsif (grant = grants.first) %>
+              <%= role_badge(grant.app_role) %>
+              <%= button_to "Remove", admin_grant_path(grant), method: :delete, class: "link-button small",
+                    form: { data: { turbo_confirm: "Remove the direct grant of #{app.name} to #{@user.display_name}?" } } %>
+            <% else %>
+              <span class="muted">—</span>
+            <% end %>
+          </td>
+          <td>
+            <%= form_with url: admin_grants_path, class: "inline-form" do |f| %>
+              <%= hidden_field_tag :app_id, app.id, id: nil %>
+              <%= hidden_field_tag :subject_type, "User", id: nil %>
+              <%= hidden_field_tag :subject_id, @user.id, id: nil %>
+              <% if app.multiple_roles? %>
+                <% held = grants.map(&:app_role_id) %>
+                <% options = app.roles.reject { held.include?(_1.id) }.sort_by { _1.key.downcase }.map { [ _1.key, _1.key ] } %>
+                <% options << [ "no access", "none" ] unless grants.any?(&:no_access?) %>
+                <%= select_tag :role, options_for_select(options), id: "grant_role_#{app.id}", "aria-label": "Role in #{app.name}" %>
+                <%= f.submit "Add", class: "btn-secondary btn-small" %>
+              <% else %>
+                <%= select_tag :role, options_for_select(app.role_keys.map { [ _1, _1 ] } + [ [ "no access", "none" ] ], (grant = grants.first) ? (grant.app_role&.key || "none") : app.lowest_role&.key),
+                      id: "grant_role_#{app.id}", "aria-label": "Role in #{app.name}" %>
+                <%= f.submit "Set", class: "btn-secondary btn-small" %>
+              <% end %>
+            <% end %>
+          </td>
+        </tr>
+      <% end %>
+    </tbody>
+  </table>
+</div>
+
+<h2>Groups</h2>
+<% if @memberships.any? %>
+  <ul class="chip-list">
+    <% @memberships.each do |membership| %>
+      <li class="chip">
+        <%= link_to membership.group.name, admin_group_path(membership.group) %>
+        <%= button_to "×", admin_group_member_path(membership.group, @user, back: "user"), method: :delete, class: "chip-remove",
+              title: "Remove from #{membership.group.name}", form: { data: { turbo_confirm: "Remove #{@user.display_name} from #{membership.group.name}?" } } %>
+      </li>
+    <% end %>
+  </ul>
+<% else %>
+  <p class="muted">In no group.</p>
+<% end %>
+<% if @other_groups.any? %>
+  <%= form_with url: admin_user_groups_path(@user), method: :post, class: "inline-form" do |f| %>
+    <%= select_tag :group_id, options_from_collection_for_select(@other_groups, :id, :name), id: "add_group", "aria-label": "Group" %>
+    <%= f.submit "Add to group", class: "btn-secondary btn-small" %>
+  <% end %>
+<% end %>
+
+<h2>Sessions</h2>
+<% if @sessions.any? %>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Host</th><th>Browser</th><th>IP</th><th>Signed in</th><th>Last seen</th><th></th></tr></thead>
+      <tbody>
+        <% @sessions.each do |row| %>
+          <tr>
+            <td><span class="pill <%= row.admin? ? 'pill-warn' : 'pill-muted' %>"><%= row.host_label %></span></td>
+            <td><%= row.browser_label %><% if row == Current.session %> <span class="pill pill-ok">you, now</span><% end %></td>
+            <td class="mono"><%= row.ip_address %></td>
+            <td><%= local_time(row.created_at) %></td>
+            <td><%= relative_time(row.last_seen_at) %></td>
+            <td class="actions-cell"><%= button_to "End", admin_user_session_path(@user, row), method: :delete, class: "btn-secondary btn-small danger" %></td>
+          </tr>
+        <% end %>
+      </tbody>
+    </table>
+  </div>
+<% else %>
+  <p class="empty">No active sessions.</p>
+<% end %>
+
+<h2>Personal tokens</h2>
+<%= render "admin/personal_tokens/table", tokens: @tokens, show_user: false, unused_ids: nil %>
+
+<h2>Signed-in extensions</h2>
+<% if @extensions.any? %>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Extension</th><th>App</th><th>Signed in</th><th>Last used</th><th></th></tr></thead>
+      <tbody>
+        <% @extensions.each do |token| %>
+          <tr>
+            <td class="mono"><%= token.client.client_id %></td>
+            <td><%= token.client.app&.name %></td>
+            <td><%= local_time(ExtensionSignIns.signed_in_at(token)) %></td>
+            <td><%= relative_time(token.last_used_at || token.created_at) %></td>
+            <td class="actions-cell"><%= button_to "Sign out", admin_user_extension_path(@user, token), method: :delete, class: "btn-secondary btn-small danger" %></td>
+          </tr>
+        <% end %>
+      </tbody>
+    </table>
+  </div>
+<% else %>
+  <p class="empty">No browser extension is signed in.</p>
+<% end %>
+
+<h2>Recent activity</h2>
+<%= render "admin/audit_events/table", events: @recent_events %>
+<p><%= link_to "Full audit log for #{@user.display_name}", admin_audit_events_path(user_id: @user.id) %></p>

@@ -1,0 +1,34 @@
+<%# The AUTH host's layout (SPECS.md §24.1): sign-in, "waiting for access", "no access", sign-out and error
+    pages, as one card. The index host has layouts/index, the admin host layouts/admin. %>
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <title><%= content_for?(:title) ? "#{yield(:title)} · Tourpaq" : "Tourpaq" %></title>
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <meta name="application-name" content="Tourpaq">
+    <%= csrf_meta_tags %>
+    <%= csp_meta_tag %>
+    <%= yield :head %>
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+    <%= stylesheet_link_tag :app, "data-turbo-track": "reload" %>
+    <%= javascript_importmap_tags %>
+  </head>
+
+  <body class="auth">
+    <div class="auth-wrap">
+      <div class="auth-brand"><img src="/favicon.svg" alt="">Tourpaq</div>
+      <main class="auth-card">
+        <%= render "shared/flash" %>
+        <%= yield %>
+      </main>
+      <% if signed_in? %>
+        <div class="auth-footer auth-whoami">
+          <span title="<%= current_user.email %>"><%= current_user.display_name %></span>
+          <%= button_to "Sign out", session_path, method: :delete, class: "btn-link" %>
+        </div>
+      <% else %>
+        <div class="auth-footer">Sign-in for the journeybooking apps</div>
+      <% end %>
+    </div>
+  </body>
+</html>

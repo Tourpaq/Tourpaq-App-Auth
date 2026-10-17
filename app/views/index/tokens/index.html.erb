@@ -1,0 +1,84 @@
+<% content_for :title, "Tokens" %>
+<h1>API and MCP tokens</h1>
+<p class="muted">A personal token lets a script, Claude Code or an MCP client use one app as you. It can never do more
+  than your role in that app allows, and it stops working while you have no access.</p>
+
+<div class="card">
+  <h2>New token</h2>
+  <% if @apps.empty? %>
+    <p class="empty">You have no access to any app yet, so there is nothing to create a token for.</p>
+  <% elsif @active_count >= PersonalToken::MAX_ACTIVE %>
+    <p class="empty">You hold <%= PersonalToken::MAX_ACTIVE %> active tokens, the most allowed. Revoke one first.</p>
+  <% else %>
+    <% if @token.errors.any? %>
+      <div class="errors" role="alert">
+        The token could not be created:
+        <ul><% @token.errors.full_messages.each do |message| %><li><%= message %></li><% end %></ul>
+      </div>
+    <% end %>
+    <%= form_with model: @token, url: index_tokens_path, scope: :personal_token, class: "form-grid",
+          data: { turbo: false, controller: "token-scopes", token_scopes_scopes_value: @scopes_by_app.to_json } do |f| %>
+      <div>
+        <%= f.label :app_id, "App" %>
+        <%= f.select :app_id, @apps.map { [ _1.name, _1.id ] }, {}, required: true, data: { token_scopes_target: "app", action: "token-scopes#update" } %>
+      </div>
+      <div>
+        <%= f.label :name, "Name" %>
+        <%= f.text_field :name, required: true, maxlength: 100, placeholder: "Claude Code on my laptop" %>
+      </div>
+      <div>
+        <%= f.label :scope, "Scope" %>
+        <%= f.select :scope, @scope_app.token_scopes.map { [ token_scope_label(_1).upcase_first, _1 ] }, {}, data: { token_scopes_target: "scope" } %>
+        <span class="hint">What the token may do in the app, lowest first; the app decides what each means.</span>
+      </div>
+      <div>
+        <%= f.label :lifetime_days, "Expires after" %>
+        <%= f.select :lifetime_days, PersonalToken::LIFETIMES.map { [ "#{_1} days", _1 ] }, selected: (@token.lifetime_days.presence || PersonalToken::DEFAULT_LIFETIME) %>
+      </div>
+      <div class="full actions">
+        <button type="submit">Create token</button>
+        <span class="hint">Shown once. Stored only as a fingerprint.</span>
+      </div>
+    <% end %>
+  <% end %>
+</div>
+
+<h2>Your tokens</h2>
+<% if @tokens.any? %>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Name</th><th>App</th><th>Scope</th><th>Token</th><th>Created</th><th>Expires</th><th>Last used</th><th></th></tr></thead>
+      <tbody>
+        <% @tokens.each do |token| %>
+          <tr class="<%= 'row-muted' unless token.active? %>">
+            <td class="wrap"><%= token.name %></td>
+            <td><%= token.app.name %></td>
+            <td><%= token_scope_label(token.scope) %></td>
+            <td class="mono"><%= token.token_hint %>…</td>
+            <td><%= local_time(token.created_at, format: :date) %></td>
+            <td>
+              <% if token.revoked? %>
+                <span class="pill pill-muted">revoked</span>
+              <% elsif token.expired? %>
+                <span class="pill pill-muted">expired</span>
+              <% else %>
+                <%= local_time(token.expires_at, format: :date) %>
+                <% if token.expires_at <= PersonalToken::REMIND_BEFORE.from_now %><span class="pill pill-warn">soon</span><% end %>
+              <% end %>
+            </td>
+            <td><%= token.last_used_at ? relative_time(token.last_used_at) : tag.span("never", class: "muted") %></td>
+            <td class="actions-cell">
+              <% if token.active? %>
+                <%= button_to "Revoke", index_token_path(token), method: :delete, class: "btn-secondary btn-small danger",
+                      form: { data: { turbo_confirm: "Revoke “#{token.name}”? Whatever uses it stops working within a minute." } } %>
+              <% end %>
+            </td>
+          </tr>
+        <% end %>
+      </tbody>
+    </table>
+  </div>
+  <p class="hint"><%= @active_count %> of <%= PersonalToken::MAX_ACTIVE %> active tokens.</p>
+<% else %>
+  <p class="empty">No tokens yet.</p>
+<% end %>

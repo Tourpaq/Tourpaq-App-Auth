@@ -1,0 +1,63 @@
+<% content_for :title, "Overview" %>
+<h1>Admin</h1>
+<p class="muted">Signed in as <%= current_admin.email %>.</p>
+<div class="cards">
+  <%= link_to admin_users_path(filter: "pending"), class: "metric metric-link" do %><div class="metric-value"><%= @pending_count %></div><div class="metric-label">pending users</div><% end %>
+  <%= link_to admin_users_path, class: "metric metric-link" do %><div class="metric-value"><%= @user_count %></div><div class="metric-label">active users</div><% end %>
+  <%= link_to admin_groups_path, class: "metric metric-link" do %><div class="metric-value"><%= @group_count %></div><div class="metric-label">groups</div><% end %>
+  <%= link_to admin_apps_path, class: "metric metric-link" do %><div class="metric-value"><%= @app_count %></div><div class="metric-label">apps</div><% end %>
+  <%= link_to admin_tokens_path, class: "metric metric-link" do %><div class="metric-value"><%= @token_count %></div><div class="metric-label">active tokens</div><% end %>
+</div>
+
+<% if @unknown_permissions.any? %>
+  <div class="attention" role="alert">
+    <strong>Unknown permissions.</strong> These roles hold keys their app's catalogue does not know (still sent to the app):
+    <ul>
+      <% @unknown_permissions.each do |app, role, keys| %>
+        <li><%= link_to app.name, admin_app_path(app) %> / <%= link_to role.key, edit_admin_app_role_path(app, role) %>:
+          <span class="unknown-permission"><%= keys.join(", ") %></span></li>
+      <% end %>
+    </ul>
+  </div>
+<% end %>
+
+<% if @expiring_secrets.any? %>
+  <h2>Client secrets expiring</h2>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Client</th><th>App</th><th>Secret</th><th>Expiry</th></tr></thead>
+      <tbody>
+        <% @expiring_secrets.each do |secret| %>
+          <tr>
+            <td><%= link_to secret.client.client_id, admin_app_client_path(secret.client.app, secret.client) %></td>
+            <td><%= secret.client.app.name %></td>
+            <td class="mono"><%= secret.hint %>…</td>
+            <td><%= expiry_pill(secret.expires_at, warn: ClientSecret::WARN_BEFORE) %></td>
+          </tr>
+        <% end %>
+      </tbody>
+    </table>
+  </div>
+<% end %>
+
+<h2>Waiting for access</h2>
+<% if @pending.any? %>
+  <p class="muted small">Signed in, given nothing yet. Add them to a group or give them access to an app.</p>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Name</th><th>Email</th><th>First seen</th></tr></thead>
+      <tbody>
+        <% @pending.each do |user| %>
+          <tr>
+            <td><%= link_to user.display_name, admin_user_path(user) %></td>
+            <td><%= user.email %></td>
+            <td><%= relative_time(user.created_at) %></td>
+          </tr>
+        <% end %>
+      </tbody>
+    </table>
+  </div>
+  <% if @pending_count > @pending.size %><p><%= link_to "All #{@pending_count} pending users", admin_users_path(filter: "pending") %></p><% end %>
+<% else %>
+  <p class="empty">Nobody is waiting.</p>
+<% end %>

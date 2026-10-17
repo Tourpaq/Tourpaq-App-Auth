@@ -1,0 +1,51 @@
+<% content_for :title, "Users" %>
+<div class="section-head">
+  <h1>Users</h1>
+  <%= link_to "Add user", new_admin_user_path, class: "button" %>
+</div>
+<p class="muted">Pending users (signed in, given nothing yet) come first.</p>
+
+<%= form_with url: admin_users_path, method: :get, class: "filters", data: { controller: "submit-on-change" } do |f| %>
+  <div>
+    <%= f.label :q, "Search" %>
+    <%= f.search_field :q, value: params[:q], placeholder: "name or email" %>
+  </div>
+  <div>
+    <%= f.label :filter, "Show" %>
+    <%= f.select :filter, [ [ "Everyone", "" ], [ "Pending", "pending" ], [ "Disabled", "disabled" ], [ "Admins", "admins" ], [ "Not signed in yet", "unbound" ] ], selected: @filter %>
+  </div>
+  <div>
+    <%= f.label :app_id, "With access to" %>
+    <%= f.select :app_id, options_from_collection_for_select(@apps, :id, :name, params[:app_id]), include_blank: "Any app" %>
+  </div>
+  <div>
+    <%= f.label :group_id, "In group" %>
+    <%= f.select :group_id, options_from_collection_for_select(@groups, :id, :name, params[:group_id]), include_blank: "Any group" %>
+  </div>
+  <div><%= f.submit "Filter" %></div>
+<% end %>
+
+<% if @users.empty? %>
+  <p class="empty">No users match.</p>
+<% else %>
+  <div class="table-wrap">
+    <table class="users-table">
+      <thead>
+        <tr><th>Name</th><th>Email</th><th>Status</th><th>Groups</th><% if @app %><th><%= @app.name %></th><% end %><th>Last sign-in</th></tr>
+      </thead>
+      <tbody>
+        <% @users.each do |user| %>
+          <tr class="<%= 'row-muted' if user.disabled? %><%= ' row-pending' if @pending_ids.include?(user.id) %>">
+            <td><%= link_to user.display_name, admin_user_path(user) %></td>
+            <td><%= user.email %></td>
+            <td><%= user_status_pills(user, pending_ids: @pending_ids) %></td>
+            <td class="wrap"><%= user.groups.sort_by(&:name).map(&:name).join(", ") %></td>
+            <% if @app %><td><%= effective_role_label(@app_roles[user.id]) %></td><% end %>
+            <td><%= user.last_login_at ? relative_time(user.last_login_at) : tag.span("never", class: "muted") %></td>
+          </tr>
+        <% end %>
+      </tbody>
+    </table>
+  </div>
+  <p class="muted small"><%= pluralize(@users.size, "user") %>.</p>
+<% end %>

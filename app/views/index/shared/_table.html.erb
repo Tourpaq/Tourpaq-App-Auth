@@ -1,0 +1,40 @@
+<%# Dense rows for the table sections and search results (WWW's apps/_table), where there are many entries and the
+    address matters more than the description. %>
+<div class="ix-table-wrap">
+  <table class="ix-table">
+    <thead>
+      <tr><th>Name</th><th>Address</th><th>Access</th><th>Status</th><th>Owner</th><th></th></tr>
+    </thead>
+    <tbody>
+      <% entries.each do |entry| %>
+        <tr data-index-filter-target="item">
+          <td class="ix-cell-name">
+            <div class="ix-cell-name-inner">
+              <%= index_icon(entry, size: "sm") %>
+              <div>
+                <%= link_to entry.name, index_entry_path(entry), class: "ix-row-title" %>
+                <div class="ix-row-desc"><%= entry.description %></div>
+                <% if entry.links.any? %>
+                  <div class="ix-row-links">
+                    <% entry.links.each do |link| %><%= link_to link.label, safe_index_href(link.url), title: link.note %><% end %>
+                  </div>
+                <% end %>
+                <%= index_role(entry) if entry.app %>
+              </div>
+            </div>
+          </td>
+          <td>
+            <% if entry.address.present? %><code class="ix-copy" data-controller="index-copy" data-index-copy-text-value="<%= entry.address %>"
+              data-action="click->index-copy#copy" title="Click to copy"><%= entry.address %></code><% end %>
+          </td>
+          <td><%= index_access_pills(entry) %></td>
+          <td><%= index_status_badge(entry) %></td>
+          <td class="muted"><%= entry.owner %></td>
+          <td class="ix-cell-actions">
+            <% if entry.url %><%= link_to "Open ↗", safe_index_href(entry.url), class: "ix-btn ix-btn-sm" %><% end %>
+          </td>
+        </tr>
+      <% end %>
+    </tbody>
+  </table>
+</div>

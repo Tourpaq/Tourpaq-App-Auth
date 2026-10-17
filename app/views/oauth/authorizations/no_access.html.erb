@@ -1,0 +1,7 @@
+<% content_for :title, "No access" %>
+<div class="waiting">
+  <h1>You don't have access to <%= @app_name %></h1>
+  <p>Hello <%= current_user.display_name %>. You are signed in, but you have no access to <%= @app_name %>.</p>
+  <p class="muted">An admin has been told.</p>
+  <p><%= link_to "Go to your apps", root_path %></p>
+</div>

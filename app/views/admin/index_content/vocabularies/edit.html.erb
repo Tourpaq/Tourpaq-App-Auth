@@ -1,0 +1,6 @@
+<% content_for :title, "Edit #{@record.label_in_database}" %>
+<%= render "admin/index_content/tabs" %>
+<h1><%= @record.label_in_database %></h1>
+<%= render "admin/index_content/vocabularies/form" %>
+<%= render "admin/index_content/delete", label: "“#{@record.label_in_database}”", url: url_for(action: :destroy, id: @record),
+           note: "Used by #{pluralize(@record.entries.size, 'entry', plural: 'entries')}; they will show it as not recorded." %>

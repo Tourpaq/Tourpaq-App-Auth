@@ -1,0 +1,26 @@
+<% content_for :title, "Index docs" %>
+<%= render "admin/index_content/tabs" %>
+<div class="section-head">
+  <h1>Docs</h1>
+  <%= link_to "Write a doc", new_admin_index_doc_path, class: "button" %>
+</div>
+<% if @docs.empty? %><p class="empty">No docs yet.</p><% end %>
+<% @docs.each do |section, docs| %>
+  <h2><%= section&.title || "No section" %></h2>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th class="num">Order</th><th>Title</th><th>URL</th><th>Changed</th><th></th></tr></thead>
+      <tbody>
+        <% docs.each do |doc| %>
+          <tr>
+            <td class="num muted"><%= doc.position %></td>
+            <td><%= link_to doc.title, edit_admin_index_doc_path(doc) %></td>
+            <td class="muted"><code><%= doc.path %></code></td>
+            <td class="muted"><%= index_time_ago(doc.updated_at) %></td>
+            <td class="actions-cell"><%= link_to "View", index_host_url(doc.path), class: "btn-secondary btn-small" %></td>
+          </tr>
+        <% end %>
+      </tbody>
+    </table>
+  </div>
+<% end %>

@@ -1,0 +1,15 @@
+<%= form_with model: [ :admin, group ], class: "card narrow-form" do |f| %>
+  <%= render "admin/shared/errors", record: group %>
+  <div class="field">
+    <%= f.label :name %>
+    <%= f.text_field :name, required: true, autofocus: true %>
+  </div>
+  <div class="field">
+    <%= f.label :description %>
+    <%= f.text_area :description, rows: 2 %>
+  </div>
+  <div class="actions">
+    <%= f.submit group.new_record? ? "Create group" : "Save" %>
+    <%= link_to "Cancel", group.new_record? ? admin_groups_path : admin_group_path(group), class: "btn-secondary" %>
+  </div>
+<% end %>

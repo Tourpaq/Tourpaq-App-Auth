@@ -1,0 +1,53 @@
+# Bound users have the fake identity provider's oid for their email (FakeIdentity.oid_for), so
+# sign_in_as(user) is the same Entra account. Tenant: the test tenant.
+<% tid = Rails.configuration.x.auth.entra_tenant_id %>
+mwi:
+  sub: 11111111-1111-4111-8111-111111111111
+  email: mwi@tourpaq.com
+  name: Mogens Winther
+  upn: mwi@tourpaq.com
+  entra_oid: <%= FakeIdentity.oid_for("mwi@tourpaq.com") %>
+  entra_tid: <%= tid %>
+  admin: true
+  last_login_at: <%= 1.day.ago.to_fs(:db) %>
+
+jjr:
+  sub: 22222222-2222-4222-8222-222222222222
+  email: jjr@tourpaq.com
+  name: Jacob
+  upn: jjr@tourpaq.com
+  entra_oid: <%= FakeIdentity.oid_for("jjr@tourpaq.com") %>
+  entra_tid: <%= tid %>
+  admin: true
+
+# A regular user in RO Dev (IRM responder through the group).
+alice:
+  sub: 33333333-3333-4333-8333-333333333333
+  email: alice@tourpaq.com
+  name: Alice Popescu
+  upn: alice@tourpaq.com
+  entra_oid: <%= FakeIdentity.oid_for("alice@tourpaq.com") %>
+  entra_tid: <%= tid %>
+
+# Signed in once, nothing granted: pending.
+bob:
+  sub: 44444444-4444-4444-8444-444444444444
+  email: bob@tourpaq.com
+  name: Bob Ionescu
+  upn: bob@tourpaq.com
+  entra_oid: <%= FakeIdentity.oid_for("bob@tourpaq.com") %>
+  entra_tid: <%= tid %>
+
+# Pre-created by an admin, not yet signed in (unbound).
+carol:
+  sub: 55555555-5555-4555-8555-555555555555
+  email: carol@contractor.example
+  name: Carol
+
+dave_disabled:
+  sub: 66666666-6666-4666-8666-666666666666
+  email: dave@tourpaq.com
+  name: Dave
+  entra_oid: <%= FakeIdentity.oid_for("dave@tourpaq.com") %>
+  entra_tid: <%= tid %>
+  disabled_at: <%= 2.days.ago.to_fs(:db) %>

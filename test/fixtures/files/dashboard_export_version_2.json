@@ -1,0 +1,265 @@
+{
+  "format": "tourpaq-dashboard-export",
+  "version": 2,
+  "exported_at": "2026-10-17T09:00:00Z",
+  "users": [
+    {
+      "id": 1,
+      "entra_oid": "aaaaaaaa-0000-4000-8000-000000000001",
+      "email": "alice@tourpaq.com",
+      "name": "Alice P.",
+      "active": true
+    },
+    {
+      "id": 2,
+      "entra_oid": "cccccccc-0000-4000-8000-000000000002",
+      "email": "Carol@Contractor.example",
+      "name": "Carol",
+      "active": true
+    },
+    {
+      "id": 3,
+      "entra_oid": "eeeeeeee-0000-4000-8000-000000000003",
+      "email": "new.bound@tourpaq.com",
+      "name": "New Bound",
+      "active": true
+    },
+    {
+      "id": 4,
+      "entra_oid": null,
+      "email": "yt.member@tourpaq.com",
+      "name": "YouTrack Member",
+      "active": true
+    },
+    {
+      "id": 5,
+      "entra_oid": null,
+      "email": "yt.nogroup@tourpaq.com",
+      "name": "YouTrack Nogroup",
+      "active": true
+    },
+    {
+      "id": 6,
+      "entra_oid": null,
+      "email": "yt.inactive@tourpaq.com",
+      "name": "YouTrack Inactive",
+      "active": false
+    },
+    {
+      "id": 7,
+      "entra_oid": "ffffffff-0000-4000-8000-000000000007",
+      "email": "left@tourpaq.com",
+      "name": "Has Left",
+      "active": false
+    },
+    {
+      "id": 8,
+      "entra_oid": "dddddddd-0000-4000-8000-000000000008",
+      "email": "bob@tourpaq.com",
+      "name": "Bob Again",
+      "active": true
+    },
+    {
+      "id": 9,
+      "entra_oid": null,
+      "email": "jjr@tourpaq.com",
+      "name": "Jacob",
+      "active": true
+    },
+    {
+      "id": 10,
+      "entra_oid": "abababab-0000-4000-8000-000000000010",
+      "email": "kim@tourpaq.com",
+      "name": "Kim",
+      "active": true
+    },
+    {
+      "id": 11,
+      "entra_oid": null,
+      "email": "not an email",
+      "name": "Broken",
+      "active": true
+    }
+  ],
+  "groups": [
+    {
+      "id": 1,
+      "name": "Administrators",
+      "description": "Full access",
+      "permissions": [
+        "admin:access:manage"
+      ],
+      "system": true
+    },
+    {
+      "id": 2,
+      "name": "Support",
+      "description": "Customers and tasks",
+      "permissions": [
+        "module:tasks:view",
+        "module:customers:view"
+      ],
+      "system": false
+    },
+    {
+      "id": 3,
+      "name": "Finance readers",
+      "description": "Read the finance figures",
+      "permissions": [
+        "module:customers:view",
+        "management:finance:view"
+      ],
+      "system": false
+    },
+    {
+      "id": 4,
+      "name": "Old group",
+      "description": null,
+      "permissions": [
+        "old:module:view"
+      ],
+      "system": false
+    }
+  ],
+  "memberships": [
+    {
+      "user_id": 1,
+      "group_id": 1
+    },
+    {
+      "user_id": 1,
+      "group_id": 2
+    },
+    {
+      "user_id": 2,
+      "group_id": 2
+    },
+    {
+      "user_id": 3,
+      "group_id": 3
+    },
+    {
+      "user_id": 4,
+      "group_id": 2
+    },
+    {
+      "user_id": 6,
+      "group_id": 2
+    },
+    {
+      "user_id": 7,
+      "group_id": 3
+    },
+    {
+      "user_id": 8,
+      "group_id": 2
+    },
+    {
+      "user_id": 9,
+      "group_id": 3
+    },
+    {
+      "user_id": 10,
+      "group_id": 2
+    }
+  ],
+  "resolved_permissions": [
+    {
+      "user_id": 1,
+      "email": "alice@tourpaq.com",
+      "active": true,
+      "permissions": [
+        "*",
+        "module:customers:view",
+        "module:tasks:view"
+      ]
+    },
+    {
+      "user_id": 2,
+      "email": "carol@contractor.example",
+      "active": true,
+      "permissions": [
+        "module:customers:view",
+        "module:tasks:view"
+      ]
+    },
+    {
+      "user_id": 3,
+      "email": "new.bound@tourpaq.com",
+      "active": true,
+      "permissions": [
+        "management:finance:view",
+        "module:customers:view"
+      ]
+    },
+    {
+      "user_id": 4,
+      "email": "yt.member@tourpaq.com",
+      "active": true,
+      "permissions": [
+        "module:customers:view",
+        "module:tasks:view"
+      ]
+    },
+    {
+      "user_id": 5,
+      "email": "yt.nogroup@tourpaq.com",
+      "active": true,
+      "permissions": []
+    },
+    {
+      "user_id": 6,
+      "email": "yt.inactive@tourpaq.com",
+      "active": false,
+      "permissions": [
+        "module:customers:view",
+        "module:tasks:view"
+      ]
+    },
+    {
+      "user_id": 7,
+      "email": "left@tourpaq.com",
+      "active": false,
+      "permissions": [
+        "management:finance:view",
+        "module:customers:view"
+      ]
+    },
+    {
+      "user_id": 8,
+      "email": "bob@tourpaq.com",
+      "active": true,
+      "permissions": [
+        "module:customers:view",
+        "module:tasks:view"
+      ]
+    },
+    {
+      "user_id": 9,
+      "email": "jjr@tourpaq.com",
+      "active": true,
+      "permissions": [
+        "management:finance:view",
+        "module:customers:view"
+      ]
+    },
+    {
+      "user_id": 10,
+      "email": "kim@tourpaq.com",
+      "active": true,
+      "permissions": [
+        "module:customers:view",
+        "module:tasks:view"
+      ]
+    }
+  ],
+  "api_tokens": [
+    {
+      "user_email": "alice@tourpaq.com",
+      "name": "Paperclip",
+      "capability": "all",
+      "last_used_at": "2026-10-16T18:00:00Z",
+      "expires_at": "2027-01-15T00:00:00Z"
+    }
+  ]
+}

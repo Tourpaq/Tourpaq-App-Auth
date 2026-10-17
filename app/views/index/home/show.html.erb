@@ -1,0 +1,80 @@
+<%# The index's front page (SPECS.md §24.3): WWW's front page for the signed-in viewer, plus their apps. %>
+<% content_for :title, index_site.title %>
+<div class="ix">
+  <%= render "index/home/token_reminders", tokens: @expiring_tokens %>
+
+  <div class="ix-hero">
+    <div class="ix-hero-head">
+      <div>
+        <h1><%= index_site.title %></h1>
+        <% if index_site.tagline.present? %><p class="muted ix-lede"><%= index_site.tagline %></p><% end %>
+      </div>
+      <% if current_user.admin? %>
+        <div class="actions"><%= link_to "Admin", admin_host_url, class: "btn-secondary admin-link" %></div>
+      <% end %>
+    </div>
+    <%= form_with url: index_search_path, method: :get, class: "ix-hero-search", data: { turbo: false } do %>
+      <input type="search" name="q" placeholder="Search apps, servers, dashboards and docs…" aria-label="Search">
+      <button type="submit">Search</button>
+    <% end %>
+  </div>
+
+  <% if @apps.any? %>
+    <section class="ix-group">
+      <h2 id="your-apps">Your apps <span class="ix-h2-note">Signed in as <%= current_user.email %></span></h2>
+      <div class="ix-grid">
+        <%= render partial: "index/shared/app_card", collection: @apps, as: :access %>
+      </div>
+    </section>
+  <% end %>
+
+  <% @card_sections.each do |section| %>
+    <% entries = @entries_by_section[section.id] || [] %>
+    <% next if entries.empty? %>
+    <section class="ix-group">
+      <h2 id="<%= section.slug %>">
+        <%= link_to section.name, index_section_path(section) %>
+        <% if section.description.present? %><span class="ix-h2-note"><%= section.description %></span><% end %>
+      </h2>
+      <div class="ix-grid">
+        <%= render partial: "index/shared/card", collection: entries, as: :entry %>
+      </div>
+    </section>
+  <% end %>
+
+  <% if @unsectioned.any? %>
+    <section class="ix-group">
+      <h2>Not yet in a group</h2>
+      <div class="ix-grid">
+        <%= render partial: "index/shared/card", collection: @unsectioned, as: :entry %>
+      </div>
+    </section>
+  <% end %>
+
+  <% tables = index_menu_sections.reject { |section, _| section.cards? } %>
+  <% if tables.any? || index_doc_sections.any? %>
+    <section class="ix-group">
+      <h2>Technical support and development</h2>
+      <div class="ix-tile-grid">
+        <% tables.each do |section, count| %>
+          <%= link_to index_section_path(section), class: "ix-tile" do %>
+            <span class="ix-tile-name"><%= section.name %> <span class="ix-nav-count"><%= count %></span></span>
+            <% if section.description.present? %><span class="ix-tile-desc"><%= section.description %></span><% end %>
+          <% end %>
+        <% end %>
+        <% index_doc_sections.each do |doc_section| %>
+          <%= link_to doc_section.docs.first.path, class: "ix-tile" do %>
+            <span class="ix-tile-name"><%= doc_section.title %> <span class="ix-nav-count"><%= pluralize(doc_section.docs.size, "doc") %></span></span>
+            <span class="ix-tile-desc"><%= doc_section.docs.map(&:title).to_sentence %></span>
+          <% end %>
+        <% end %>
+      </div>
+    </section>
+  <% end %>
+
+  <% if @apps.empty? && @entries_by_section.empty? %>
+    <p class="empty">Nothing has been given to you yet. An admin can give you access.</p>
+  <% end %>
+
+  <% if index_site.footer.present? %><p class="ix-page-footer muted"><%= index_site.footer %></p><% end %>
+</div>

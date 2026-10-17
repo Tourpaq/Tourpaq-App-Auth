@@ -1,0 +1,11 @@
+<% content_for :title, "Sign out" %>
+<h1>Sign out of Tourpaq?</h1>
+<p><%= @client ? "#{Oidc::Access.app_name(@client)} asks" : "An app asks" %> to end your Tourpaq sign-in in this browser (<%= current_user.email %>).</p>
+<p class="muted">Your other apps keep their own sessions. You stay signed in to Microsoft.</p>
+<%= form_tag oauth_logout_path, method: :post, class: "actions" do %>
+  <%= hidden_field_tag :client_id, @client&.client_id if @client %>
+  <%= hidden_field_tag :post_logout_redirect_uri, @post_logout_uri if @post_logout_uri %>
+  <%= hidden_field_tag :state, params[:state] if params[:state].present? %>
+  <button type="submit">Sign out</button>
+  <%= link_to "Stay signed in", root_path, class: "btn-secondary" %>
+<% end %>

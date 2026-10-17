@@ -1,0 +1,35 @@
+<%# The index's navigation in the index host's sidebar (SPECS.md §24.3), as on WWW: search (press /), the front page,
+    the sections the viewer may see (cards sections, then table sections) with their visible entries' count, and the
+    docs. Rendered by layouts/index for a signed-in user. %>
+<%= form_with url: index_search_path, method: :get, class: "ix-nav-search", data: { turbo: false, controller: "index-search",
+      index_search_url_value: index_search_path(format: :json) } do %>
+  <input type="search" name="q" value="<%= @query %>" placeholder="Search…  /" autocomplete="off"
+         aria-label="Search apps, services and docs" data-index-search-target="input">
+  <div class="ix-search-results" data-index-search-target="results" hidden></div>
+<% end %>
+
+<%= link_to "Home", index_root_path, class: index_nav_class(current_page?(index_root_path)) %>
+
+<% cards, tables = index_menu_sections.partition { |section, _| section.cards? } %>
+<% [ [ "Apps and services", cards ], [ "Technical", tables ] ].each do |heading, sections| %>
+  <% next if sections.empty? %>
+  <div class="nav-section"><%= heading %></div>
+  <% sections.each do |section, count| %>
+    <%= link_to index_section_path(section), class: index_nav_class(@section == section) do %>
+      <span><%= section.name %></span><span class="ix-nav-count"><%= count %></span>
+    <% end %>
+  <% end %>
+<% end %>
+
+<% index_doc_sections.each do |doc_section| %>
+  <div class="nav-section"><%= doc_section.title %></div>
+  <% doc_section.docs.each do |doc| %>
+    <%= link_to doc.title, doc.path, class: index_nav_class(@doc == doc) %>
+  <% end %>
+<% end %>
+
+<% if (updated = index_last_updated_at) %>
+  <div class="ix-build-status" title="Last change to any entry, section or doc">
+    <span class="ix-build-dot"></span><span>Updated <%= index_time_ago(updated) %></span>
+  </div>
+<% end %>

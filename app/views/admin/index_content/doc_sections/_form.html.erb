@@ -1,0 +1,20 @@
+<%= form_with model: [ :admin, section ], class: "card ix-admin-form narrow-form" do |f| %>
+  <%= render "admin/shared/errors", record: section %>
+  <div class="field">
+    <%= f.label :title %>
+    <%= f.text_field :title, required: true %>
+  </div>
+  <div class="field">
+    <%= f.label :key, "Key (in the URL)" %>
+    <%= f.text_field :key, placeholder: "made from the title" %>
+    <p class="hint">Changing it changes every doc's URL in this section.</p>
+  </div>
+  <div class="field">
+    <%= f.label :position, "Order" %>
+    <%= f.number_field :position %>
+  </div>
+  <div class="actions">
+    <%= f.submit section.persisted? ? "Save" : "Add" %>
+    <%= link_to "Cancel", admin_index_doc_sections_path, class: "btn-secondary" %>
+  </div>
+<% end %>

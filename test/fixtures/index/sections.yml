@@ -1,0 +1,16 @@
+# A cards section for everyone, and a table section for DK Tech and RO DevOps (WWW's everyone / technical).
+apps:
+  name: Apps
+  slug: apps
+  layout: cards
+  visibility: everyone
+  description: Our own internal applications.
+  position: 10
+
+databases:
+  name: Databases
+  slug: databases
+  layout: table
+  visibility: groups
+  description: SQL Server masters and replicas.
+  position: 20

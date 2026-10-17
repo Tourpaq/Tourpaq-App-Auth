@@ -1,0 +1,12 @@
+<%# An auth app the viewer has access to that no entry stands for (the old launcher's tile, as a card). %>
+<article class="ix-card ix-app-card">
+  <div class="ix-card-head">
+    <%= index_icon(access.app) %>
+    <h3 class="ix-card-name"><%= access.app.url.present? ? link_to(access.app.name, safe_index_href(access.app.url)) : access.app.name %></h3>
+  </div>
+  <% if access.app.description.present? %><p class="ix-card-desc"><%= access.app.description %></p><% end %>
+  <div class="ix-card-role"><%= effective_role_label(access) %></div>
+  <% if access.app.url.present? %>
+    <div class="ix-card-foot"><div class="ix-card-links"><%= link_to "Open ↗", safe_index_href(access.app.url), class: "ix-btn" %></div></div>
+  <% end %>
+</article>

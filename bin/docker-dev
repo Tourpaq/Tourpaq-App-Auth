@@ -1,0 +1,44 @@
+#!/usr/bin/env bash
+# Run any command inside the development image with the source mounted, so the app
+# can be developed and tested without a working local Ruby toolchain.
+#
+#   bin/docker-dev bundle install
+#   bin/docker-dev bin/rails db:prepare
+#   bin/docker-dev bin/rails test
+#   bin/docker-dev                      # rails server: http://auth.localhost:3050 (sign-in, OIDC, API),
+#                                       # http://index.localhost:3050 (index), http://admin.localhost:3050 (admin)
+#
+# Gems live in the "auth_bundle" volume; SQLite databases in the local ./storage folder.
+# Solid Queue runs inside Puma (SOLID_QUEUE_IN_PUMA), as in production: no separate worker.
+set -euo pipefail
+cd "$(dirname "$0")/.."
+
+docker build -q --target dev -t auth-dev . >/dev/null
+
+args=(--rm -v "$PWD":/rails -v auth_bundle:/usr/local/bundle)
+# Only the web server publishes a port, so several one-off commands can run side by side: no arguments, bin/dev,
+# or [bundle exec] [bin/]rails server|s. Only the command words count, not the rest of the line (a runner script
+# that merely mentions "rails server" or "bin/dev-stack" is no server).
+cmd1=${1:-} cmd2=${2:-}
+if [ "$cmd1" = bundle ] && [ "$cmd2" = exec ]; then cmd1=${3:-} cmd2=${4:-}; fi
+if [ $# -eq 0 ] || [ "$cmd1" = bin/dev ] || { [[ "$cmd1" == rails || "$cmd1" == bin/rails ]] && [[ "$cmd2" == server || "$cmd2" == s ]]; }; then
+  args+=(-p "${WEB_PORT:-3050}:3050")
+fi
+[ -t 0 ] && args+=(-it)
+# ENV_FILE=.env.auth-local bin/docker-dev …  uses that file instead of .env (the local test stack, the auth app's
+# bin/dev-stack and docs/local-testing.md); without it, .env as before.
+if [ -n "${ENV_FILE:-}" ]; then
+  [ -f "$ENV_FILE" ] || { echo "ENV_FILE=$ENV_FILE: no such file (run the auth app's bin/dev-stack first)" >&2; exit 1; }
+  args+=(--env-file "$ENV_FILE")
+elif [ -f .env ]; then
+  args+=(--env-file .env)
+fi
+[ -n "${DOCKER_NAME:-}" ] && args+=(--name "$DOCKER_NAME")
+# Test runs side by side: TEST_DB=storage/test_x.sqlite3 PARALLEL_WORKERS=1 bin/docker-dev bin/rails test
+# APPLY=1 bin/docker-dev bin/rails "auth:import_dashboard[file]" applies the Dashboard import (SPECS.md §23.5),
+# FORCE=1 applies it again; FORCE=1 also lets "auth:client_secret[client_id]" run in production.
+for var in TEST_DB PARALLEL_WORKERS APPLY FORCE; do
+  [ -n "${!var:-}" ] && args+=(-e "$var=${!var}")
+done
+
+exec docker run "${args[@]}" auth-dev "$@"

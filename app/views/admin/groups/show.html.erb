@@ -1,0 +1,86 @@
+<% content_for :title, @group.name %>
+<div class="section-head">
+  <div>
+    <h1><%= @group.name %></h1>
+    <% if @group.description.present? %><p class="muted"><%= @group.description %></p><% end %>
+  </div>
+  <div class="actions"><%= link_to "Edit", edit_admin_group_path(@group), class: "btn-secondary" %></div>
+</div>
+
+<h2>Access</h2>
+<p class="muted small">The role this group gives its members in each app. A member's direct grant wins over it. In apps with
+  several roles per user the group may give several, and members get them on top of their own.</p>
+<div class="table-wrap">
+  <table class="access-table">
+    <thead><tr><th>App</th><th>Group role</th><th>Set</th></tr></thead>
+    <tbody>
+      <% @apps.each do |app| %>
+        <% grants = @grants.fetch(app.id, []) %>
+        <tr class="<%= 'row-muted' if app.disabled? %>">
+          <td><%= link_to app.name, admin_app_path(app) %><% if app.multiple_roles? %> <span class="pill pill-muted">several roles</span><% end %></td>
+          <td>
+            <% if app.multiple_roles? && grants.any? %>
+              <ul class="chip-list">
+                <% grants.sort_by { _1.app_role.key.downcase }.each do |grant| %>
+                  <li class="chip">
+                    <%= role_badge(grant.app_role) %>
+                    <%= button_to "×", admin_grant_path(grant), method: :delete, class: "chip-remove", title: "Remove #{grant.app_role.key}",
+                          form: { data: { turbo_confirm: "Remove #{grant.app_role.key} in #{app.name} from #{@group.name}? Members lose what only it gave them." } } %>
+                  </li>
+                <% end %>
+              </ul>
+            <% elsif (grant = grants.first) %>
+              <%= role_badge(grant.app_role) %>
+              <%= button_to "Remove", admin_grant_path(grant), method: :delete, class: "link-button small",
+                    form: { data: { turbo_confirm: "Remove #{app.name} from #{@group.name}? Members lose the access only this group gave them." } } %>
+            <% else %>
+              <span class="muted">—</span>
+            <% end %>
+          </td>
+          <td>
+            <% options = app.multiple_roles? ? app.roles.reject { |r| grants.any? { _1.app_role_id == r.id } }.sort_by { _1.key.downcase }.map(&:key) : app.role_keys %>
+            <% if options.any? %>
+              <%= form_with url: admin_grants_path, class: "inline-form" do |f| %>
+                <%= hidden_field_tag :app_id, app.id, id: nil %>
+                <%= hidden_field_tag :subject_type, "Group", id: nil %>
+                <%= hidden_field_tag :subject_id, @group.id, id: nil %>
+                <%= select_tag :role, options_for_select(options, app.multiple_roles? ? nil : (grants.first&.app_role&.key || app.lowest_role&.key)), id: "grant_role_#{app.id}", "aria-label": "Role in #{app.name}" %>
+                <%= f.submit app.multiple_roles? ? "Add" : "Set", class: "btn-secondary btn-small" %>
+              <% end %>
+            <% end %>
+          </td>
+        </tr>
+      <% end %>
+    </tbody>
+  </table>
+</div>
+
+<h2>Members (<%= @members.size %>)</h2>
+<% if @non_members.any? %>
+  <%= form_with url: admin_group_members_path(@group), class: "inline-form add-member" do |f| %>
+    <%= select_tag :user_id, options_for_select(@non_members.map { [ "#{_1.display_name} (#{_1.email})", _1.id ] }), id: "add_member", "aria-label": "User" %>
+    <%= f.submit "Add member", class: "btn-secondary btn-small" %>
+  <% end %>
+<% end %>
+<% if @members.any? %>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Name</th><th>Email</th><th>Status</th><th></th></tr></thead>
+      <tbody>
+        <% @members.each do |user| %>
+          <tr class="<%= 'row-muted' if user.disabled? %>">
+            <td><%= link_to user.display_name, admin_user_path(user) %></td>
+            <td><%= user.email %></td>
+            <td><%= user_status_pills(user) %></td>
+            <td class="actions-cell">
+              <%= button_to "Remove", admin_group_member_path(@group, user), method: :delete, class: "btn-secondary btn-small danger",
+                    form: { data: { turbo_confirm: "Remove #{user.display_name} from #{@group.name}?" } } %>
+            </td>
+          </tr>
+        <% end %>
+      </tbody>
+    </table>
+  </div>
+<% else %>
+  <p class="empty">No members yet.</p>
+<% end %>

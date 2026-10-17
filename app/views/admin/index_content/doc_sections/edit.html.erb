@@ -1,0 +1,6 @@
+<% content_for :title, "Edit #{@section.title_in_database}" %>
+<%= render "admin/index_content/tabs" %>
+<h1><%= @section.title_in_database %></h1>
+<%= render "form", section: @section %>
+<%= render "admin/index_content/delete", label: "section “#{@section.title_in_database}”", url: admin_index_doc_section_path(@section),
+           note: "Its docs are kept, without a section." %>

@@ -1,0 +1,6 @@
+deploying:
+  doc_section: deployment
+  slug: deploying-a-new-app
+  title: App deployment
+  summary: How to get an app online.
+  body: "## Before you start\n\nText.\n\n## Step 1\n\nMore.\n\n### Detail\n\nEven more."

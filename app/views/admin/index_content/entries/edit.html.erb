@@ -1,0 +1,6 @@
+<% content_for :title, "Edit #{@entry.name_in_database}" %>
+<%= render "admin/index_content/tabs" %>
+<h1><%= @entry.name_in_database %></h1>
+<p class="muted">Last changed <%= index_time_ago(@entry.updated_at) %>. Shown to: <%= @entry.visibility_label %>.</p>
+<%= render "form", entry: @entry %>
+<%= render "admin/index_content/delete", label: "“#{@entry.name_in_database}”", url: admin_index_entry_path(@entry) %>

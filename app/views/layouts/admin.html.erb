@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <title><%= content_for?(:title) ? "#{yield(:title)} · Tourpaq Admin" : "Tourpaq Admin" %></title>
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <meta name="application-name" content="Tourpaq Admin">
+    <meta name="robots" content="noindex">
+    <%= csrf_meta_tags %>
+    <%= csp_meta_tag %>
+    <%= yield :head %>
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+    <%= stylesheet_link_tag :app, "data-turbo-track": "reload" %>
+    <%= javascript_importmap_tags %>
+  </head>
+
+  <% if admin_signed_in? && current_admin.admin? && current_admin.active? %>
+    <body class="admin">
+      <div class="app">
+        <nav class="sidebar">
+          <div class="brand"><img src="/favicon.svg" alt="">Tourpaq Admin</div>
+          <%= nav_link "Overview", admin_root_path %>
+          <%= nav_link "Users", admin_users_path, count: User.pending.count %>
+          <%= nav_link "Groups", admin_groups_path %>
+          <%= nav_link "Apps", admin_apps_path %>
+          <%= nav_link "Access matrix", admin_access_matrix_path %>
+          <%= nav_link "Tokens", admin_tokens_path %>
+          <%= nav_link "Audit log", admin_audit_events_path %>
+          <div class="nav-section">Index</div>
+          <%= nav_link "Index content", admin_index_root_path %>
+          <%= link_to "Open the index", index_host_url, class: "nav-item" %>
+
+          <div class="whoami">
+            <div class="who">
+              <span class="name" title="<%= current_admin.email %>"><%= current_admin.display_name %></span>
+              <span class="badge role-admin">admin</span>
+            </div>
+            <%= button_to "Sign out", admin_session_path, method: :delete %>
+          </div>
+        </nav>
+
+        <main class="content">
+          <% if (warning = entra_secret_warning) %>
+            <div class="banner banner-<%= warning.first %>" role="alert"><%= warning.last %></div>
+          <% end %>
+          <%= render "shared/flash" %>
+          <%= yield %>
+        </main>
+      </div>
+    </body>
+  <% else %>
+    <body class="auth admin">
+      <div class="auth-wrap">
+        <div class="auth-brand"><img src="/favicon.svg" alt="">Tourpaq Admin</div>
+        <main class="auth-card">
+          <%= render "shared/flash" %>
+          <%= yield %>
+        </main>
+        <div class="auth-footer">Admin host · limited to admins</div>
+      </div>
+    </body>
+  <% end %>
+</html>

@@ -1,0 +1,6 @@
+<% content_for :title, "Edit #{@doc.title_in_database}" %>
+<%= render "admin/index_content/tabs" %>
+<h1><%= @doc.title_in_database %></h1>
+<p class="muted">Last changed <%= index_time_ago(@doc.updated_at) %>.</p>
+<%= render "form", doc: @doc %>
+<%= render "admin/index_content/delete", label: "“#{@doc.title_in_database}”", url: admin_index_doc_path(@doc) %>

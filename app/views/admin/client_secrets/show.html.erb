@@ -1,0 +1,17 @@
+<% content_for :title, "New secret for #{@client.client_id}" %>
+<p class="breadcrumb"><%= link_to "Apps", admin_apps_path %> / <%= link_to @app.name, admin_app_path(@app) %> / <%= link_to @client.client_id, admin_app_client_path(@app, @client) %></p>
+<h1>New secret for <%= @client.client_id %></h1>
+<p class="once-warning">Copy it now: this is the only time it is shown. Only its hash is kept.</p>
+<div class="link-box" data-controller="copy">
+  <input type="text" readonly value="<%= @secret_plain %>" data-copy-target="source" aria-label="Client secret" autocomplete="off">
+  <button type="button" data-copy-target="button">Copy</button>
+</div>
+<div class="card">
+  <p>Set it in <%= @app.name %>'s environment:</p>
+  <pre>LOGIN_ISSUER=<%= AuthHosts.auth_url %>
+LOGIN_CLIENT_ID=<%= @client.client_id %>
+LOGIN_CLIENT_SECRET=&lt;the secret above&gt;</pre>
+  <p class="muted small">Expiry: <%= @secret.expires_at ? local_time(@secret.expires_at, format: :date) : "never" %>.
+    After deploying the app with it, delete the old secret.</p>
+</div>
+<p><%= link_to "Back to #{@client.client_id}", admin_app_client_path(@app, @client), class: "btn-secondary" %></p>

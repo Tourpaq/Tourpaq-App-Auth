@@ -1,0 +1,41 @@
+#!/usr/bin/env bash
+# Copies the shared Ruby client (clients/ruby, SPECS.md §13) into an app, so it can use
+#
+#   gem "tourpaq_auth", path: "vendor/gems/tourpaq_auth"
+#
+# inside its Docker build (the build context only sees the app's own directory).
+#
+#   bin/sync-client ../Tourpaq-App-IRM
+#
+# Only the gem itself is copied (lib/, the gemspec and the README), not its tests. The target
+# folder is replaced, so local edits there are lost: change the gem here and sync again.
+set -euo pipefail
+
+if [ $# -ne 1 ]; then
+  echo "usage: bin/sync-client <app directory>" >&2
+  exit 64
+fi
+
+source_dir="$(cd "$(dirname "$0")/../clients/ruby" && pwd)"
+app_dir="$(cd "$1" && pwd)"
+
+if [ ! -f "$app_dir/Gemfile" ]; then
+  echo "$app_dir has no Gemfile; is it a Rails app?" >&2
+  exit 1
+fi
+if [ "$app_dir" = "$(cd "$source_dir/../.." && pwd)" ]; then
+  echo "Refusing to sync the client into the auth app itself." >&2
+  exit 1
+fi
+
+target="$app_dir/vendor/gems/tourpaq_auth"
+rm -rf "$target"
+mkdir -p "$target"
+cp -R "$source_dir/lib" "$target/lib"
+cp "$source_dir/tourpaq_auth.gemspec" "$source_dir/README.md" "$target/"
+
+version="$(sed -n 's/.*VERSION = "\(.*\)".*/\1/p' "$source_dir/lib/tourpaq_auth/version.rb")"
+echo "tourpaq_auth $version copied to $target"
+if ! grep -q 'gem "tourpaq_auth"' "$app_dir/Gemfile"; then
+  echo "Next: add  gem \"tourpaq_auth\", path: \"vendor/gems/tourpaq_auth\"  to $app_dir/Gemfile and run bundle install." 
+fi

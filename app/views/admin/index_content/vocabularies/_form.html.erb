@@ -1,0 +1,23 @@
+<%= form_with model: [ :admin, @record ], class: "card ix-admin-form narrow-form" do |f| %>
+  <%= render "admin/shared/errors", record: @record %>
+  <div class="field">
+    <%= f.label :label %>
+    <%= f.text_field :label, required: true %>
+  </div>
+  <div class="field">
+    <%= f.label :tone %>
+    <%= f.select :tone, [ [ "ok (green)", "ok" ], [ "warn (amber)", "warn" ], [ "danger (red)", "danger" ], [ "neutral (grey)", "neutral" ] ] %>
+  </div>
+  <div class="field">
+    <%= f.label :key %>
+    <%= f.text_field :key, placeholder: "made from the label" %>
+  </div>
+  <div class="field">
+    <%= f.label :position, "Order" %>
+    <%= f.number_field :position %>
+  </div>
+  <div class="actions">
+    <%= f.submit @record.persisted? ? "Save" : "Add" %>
+    <%= link_to "Cancel", url_for(action: :index), class: "btn-secondary" %>
+  </div>
+<% end %>

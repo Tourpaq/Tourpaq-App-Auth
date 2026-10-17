@@ -1,0 +1,4 @@
+<% content_for :title, "Not signed in" %>
+<h1>Not signed in</h1>
+<p><%= @message %></p>
+<p><%= link_to "Try again", sign_in_path(stay: 1) %></p>

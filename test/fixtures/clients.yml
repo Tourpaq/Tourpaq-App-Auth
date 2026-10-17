@@ -1,0 +1,37 @@
+irm_web:
+  app: irm
+  client_id: irm-web
+  kind: web
+  name: IRM web
+  redirect_uris: ["https://irm.app.journeybooking.eu/sso/callback", "http://localhost:3030/sso/callback"]
+  post_logout_redirect_uris: ["https://irm.app.journeybooking.eu/"]
+
+irm_extension:
+  app: irm
+  client_id: irm-extension
+  kind: extension
+  name: IRM browser extension
+  redirect_uris: ["https://abcdefghijklmnopabcdefghijklmnop.chromiumapp.org/"]
+  post_logout_redirect_uris: []
+
+kpi_web:
+  app: kpi
+  client_id: kpi-web
+  kind: web
+  name: KPI web
+  redirect_uris: ["https://kpi.app.journeybooking.eu/sso/callback"]
+  post_logout_redirect_uris: []
+
+admin:
+  client_id: admin
+  kind: internal
+  name: Admin host
+  redirect_uris: []
+  post_logout_redirect_uris: []
+
+index:
+  client_id: index
+  kind: internal
+  name: Index host
+  redirect_uris: []
+  post_logout_redirect_uris: []

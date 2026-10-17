@@ -1,0 +1,20 @@
+<% content_for :title, "Add user" %>
+<h1>Add user</h1>
+<p class="muted">Add someone before they have signed in, to give them access in advance. At their first Microsoft
+  sign-in with this email address the account becomes theirs (once; after that only their Entra account counts).</p>
+
+<%= form_with model: @user, url: admin_users_path, class: "card narrow-form" do |f| %>
+  <%= render "admin/shared/errors", record: @user %>
+  <div class="field">
+    <%= f.label :email, "Email (as in Entra)" %>
+    <%= f.email_field :email, required: true, autofocus: true, placeholder: "name@tourpaq.com" %>
+  </div>
+  <div class="field">
+    <%= f.label :name, "Name (optional; Entra's name replaces it at sign-in)" %>
+    <%= f.text_field :name %>
+  </div>
+  <div class="actions">
+    <%= f.submit "Add user" %>
+    <%= link_to "Cancel", admin_users_path, class: "btn-secondary" %>
+  </div>
+<% end %>

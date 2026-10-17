@@ -1,0 +1,40 @@
+<% content_for :title, "Reorder #{@app.name} roles" %>
+<p class="breadcrumb"><%= link_to "Apps", admin_apps_path %> / <%= link_to @app.name, admin_app_path(@app) %></p>
+<h1>Reorder the roles of <%= @app.name %></h1>
+
+<div class="grid-2">
+  <div class="card">
+    <h3>Now</h3>
+    <p class="mono"><%= @app.role_keys.join(" < ") %></p>
+  </div>
+  <div class="card">
+    <h3>New order</h3>
+    <p class="mono"><%= @keys.join(" < ") %></p>
+  </div>
+</div>
+
+<% if @changes.empty? %>
+  <p class="flash flash-notice">Nobody's effective role changes.</p>
+<% else %>
+  <p class="flash flash-alert"><strong><%= pluralize(@changes.size, "user") %>'s effective role changes</strong> with this order.</p>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>User</th><th>Now</th><th>After</th></tr></thead>
+      <tbody>
+        <% @changes.each do |change| %>
+          <tr>
+            <td><%= link_to change.user.display_name, admin_user_path(change.user) %></td>
+            <td><%= role_badge(change.before) %></td>
+            <td><%= role_badge(change.after) %></td>
+          </tr>
+        <% end %>
+      </tbody>
+    </table>
+  </div>
+<% end %>
+
+<%= form_with url: reorder_admin_app_roles_path(@app), method: :patch, class: "actions save-order" do |f| %>
+  <% @keys.each do |key| %><%= hidden_field_tag "keys[]", key, id: nil %><% end %>
+  <%= f.submit "Save this order" %>
+  <%= link_to "Cancel", admin_app_path(@app), class: "btn-secondary" %>
+<% end %>

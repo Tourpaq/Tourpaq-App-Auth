@@ -1,0 +1,58 @@
+# The NetBird network resources (additional_services.txt, October 2026), as
+# cards. Resources in the grp_tp_hetzner_to_azure group use the
+# netbird-hetzner access level; the rest had no group and use netbird.
+#
+# `address` is the NetBird resource itself. `url` is only set where there is a
+# web UI to open. When an existing card already points at the same host, the
+# importer adds the address to that card instead of making a second one.
+
+- { name: Backup Control Plane, address: 10.50.1.10/32, category: Infrastructure, access: netbird,
+    description: Control plane for the backups. }
+
+- { name: GitLab, address: git.tourpaq.com, url: "https://git.tourpaq.com", category: DevOps, access: netbird,
+    description: "Source code, merge requests and CI pipelines." }
+
+- { name: Grafana - Bravo, address: bravo-grafana.tourpaq.com, url: "https://bravo-grafana.tourpaq.com", category: DevOps, access: netbird,
+    description: Dashboards for the Bravo environment. }
+- { name: Grafana - X, address: grafana.tourpaq.com, url: "https://grafana.tourpaq.com", category: DevOps, access: netbird,
+    description: Dashboards for the X environment. }
+
+- { name: Logs - Bravo, address: bravo-logs-tools.tourpaq.com, url: "https://bravo-logs-tools.tourpaq.com", category: DevOps, access: netbird,
+    description: Central log search for the Bravo environment. }
+- { name: Logs - X, address: logs-tools.tourpaq.com, url: "https://logs-tools.tourpaq.com", category: DevOps, access: netbird,
+    description: Central log search for the X environment. }
+
+- { name: Trace - Bravo, address: bravo-otlp-tools.tourpaq.com, url: "https://bravo-otlp-tools.tourpaq.com", category: DevOps, access: netbird,
+    description: Trace data for the Bravo environment. }
+- { name: Trace - X, address: otlp-tools.tourpaq.com, url: "https://otlp-tools.tourpaq.com", category: DevOps, access: netbird,
+    description: Trace data for the X environment. }
+
+- { name: Prometheus - Bravo, address: bravo-prometheus.tourpaq.com, url: "https://bravo-prometheus.tourpaq.com", category: DevOps, access: netbird-hetzner,
+    description: Kubernetes metrics for the Bravo environment. }
+- { name: Prometheus - X, address: prometheus.tourpaq.com, url: "https://prometheus.tourpaq.com", category: DevOps, access: netbird-hetzner,
+    description: Kubernetes metrics for the X environment. }
+
+- { name: Tracing - Bravo, address: tracing-bp-we-01.tourpaq.com, category: DevOps, access: netbird-hetzner,
+    description: Elasticsearch cluster behind logs and traces for Bravo. }
+- { name: Tracing - Staging, address: tracing-s-we-01.tourpaq.com, category: DevOps, access: netbird-hetzner,
+    description: Elasticsearch cluster behind logs and traces for Staging. }
+- { name: Tracing - X, address: tracing-p-we-01.tourpaq.com, category: DevOps, access: netbird-hetzner,
+    description: Elasticsearch cluster behind logs and traces for X. }
+
+- { name: MS SQL Master - Bravo, address: sql-bp-we-01.tourpaq.com, category: Databases, access: netbird-hetzner,
+    description: Primary SQL Server for the Bravo environment. }
+- { name: MS SQL Master - Staging, address: sql-s-we-01.tourpaq.com, category: Databases, access: netbird-hetzner,
+    description: Primary SQL Server for the Staging environment. }
+- { name: MS SQL Master - X, address: sql-p-we-01.tourpaq.com, category: Databases, access: netbird-hetzner,
+    description: Primary SQL Server for the X environment. }
+- { name: MS SQL Replica - Bravo, address: sqlr-bp-we-01.tourpaq.com, category: Databases, access: netbird,
+    description: Read replica of the Bravo SQL Server. }
+- { name: MS SQL Replica - Staging, address: sqlrepl-s-we-01.tourpaq.com, category: Databases, access: netbird,
+    description: Read replica of the Staging SQL Server. }
+- { name: MS SQL Replica - X, address: sqlrepl-p-we-01.tourpaq.com, category: Databases, access: netbird,
+    description: Read replica of the X SQL Server. }
+
+- { name: Transport - Bravo, address: bravo-transport-service-x.tourpaq.com, category: Integrations, access: netbird,
+    description: Transport service for the Bravo environment. }
+- { name: Transport - X, address: transport-service-x.tourpaq.com, category: Integrations, access: netbird,
+    description: Transport service for the X environment. }

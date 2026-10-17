@@ -1,0 +1,42 @@
+<%# tokens: [PersonalToken]; show_user: a column with the owner; unused_ids: ids to flag "unused 90 days" (nil: work it out). %>
+<% if tokens.empty? %>
+  <p class="empty">No tokens.</p>
+<% else %>
+  <div class="table-wrap">
+    <table class="tokens-table">
+      <thead>
+        <tr><% if show_user %><th>User</th><% end %><th>Name</th><th>App</th><th>Scope</th><th>Token</th><th>Created</th><th>Expires</th><th>Last used</th><th></th></tr>
+      </thead>
+      <tbody>
+        <% tokens.each do |token| %>
+          <% unused = token.active? && (unused_ids ? unused_ids.include?(token.id) : (token.last_used_at || token.created_at) < PersonalToken::UNUSED_AFTER.ago) %>
+          <tr class="<%= 'row-muted' unless token.active? %>">
+            <% if show_user %><td><%= link_to token.user.display_name, admin_user_path(token.user) %></td><% end %>
+            <td><%= token.name %></td>
+            <td><%= token.app.name %></td>
+            <td><span class="pill <%= token.highest_scope? ? 'pill-warn' : 'pill-muted' %>"><%= token.scope %></span></td>
+            <td class="mono"><%= token.token_hint %>…</td>
+            <td><%= local_time(token.created_at, format: :date) %></td>
+            <td>
+              <% if token.revoked? %>
+                <span class="pill pill-bad">revoked <%= local_time(token.revoked_at, format: :date) %></span>
+              <% else %>
+                <%= expiry_pill(token.expires_at, warn: PersonalToken::REMIND_BEFORE) %>
+              <% end %>
+            </td>
+            <td>
+              <%= token.last_used_at ? relative_time(token.last_used_at) : tag.span("never", class: "muted") %>
+              <% if unused %><span class="pill pill-warn" title="Not used for 90 days">unused 90 days</span><% end %>
+            </td>
+            <td class="actions-cell">
+              <% if token.active? %>
+                <%= button_to "Revoke", admin_token_path(token), method: :delete, class: "btn-secondary btn-small danger",
+                      form: { data: { turbo_confirm: "Revoke #{token.name} of #{token.user.display_name}? It stops working within a minute." } } %>
+              <% end %>
+            </td>
+          </tr>
+        <% end %>
+      </tbody>
+    </table>
+  </div>
+<% end %>

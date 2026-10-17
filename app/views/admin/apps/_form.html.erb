@@ -1,0 +1,67 @@
+<%= form_with model: [ :admin, app ], class: "card" do |f| %>
+  <%= render "admin/shared/errors", record: app %>
+  <div class="form-grid">
+    <div class="field">
+      <%= f.label :name %>
+      <%= f.text_field :name, required: true %>
+    </div>
+    <div class="field">
+      <%= f.label :slug, "Slug (in claims and token prefixes; cannot change later)" %>
+      <% if app.new_record? %>
+        <%= f.text_field :slug, required: true, placeholder: "e.g. azure-cost", pattern: "[a-z0-9]+(-[a-z0-9]+)*" %>
+      <% else %>
+        <input type="text" value="<%= app.slug %>" disabled aria-label="Slug" class="mono">
+      <% end %>
+    </div>
+    <div class="field">
+      <%= f.label :role_claim, "Role claim in the ID token" %>
+      <%= f.text_field :role_claim, placeholder: "default: <slug>_role (<slug>_roles with multiple roles)" %>
+    </div>
+    <div class="field">
+      <%= f.label :url, "URL (the launcher tile)" %>
+      <%= f.url_field :url, placeholder: "https://…" %>
+    </div>
+    <div class="field">
+      <%= f.label :icon, "Icon (#{UiHelper::APP_ICONS.keys.join(', ')}, or an emoji)" %>
+      <%= f.text_field :icon %>
+    </div>
+    <div class="field full">
+      <%= f.label :description %>
+      <%= f.text_area :description, rows: 2 %>
+    </div>
+    <div class="field full">
+      <label class="check"><%= f.check_box :multiple_roles %> Multiple roles: a user may hold several roles, each a set of permissions, and gets their union</label>
+      <p class="hint">For apps that check permissions (SPECS.md §23.2), such as the Dashboard. The role claim is then a list, and
+        <span class="mono">&lt;slug&gt;_permissions</span> carries the permissions. The app pushes its permission catalogue with
+        <span class="mono">PUT /api/v1/catalogue</span>.</p>
+    </div>
+    <div class="field">
+      <%= f.label :admin_permission, "Admin permission (multiple roles only)" %>
+      <%= f.text_field :admin_permission, placeholder: "e.g. admin:access:manage", class: "mono" %>
+      <p class="hint">Somebody active must always hold it (through it or *): changes that would leave nobody are refused.</p>
+    </div>
+    <div class="field">
+      <%= f.label :token_scope_list, "Token scopes, lowest first" %>
+      <%= f.text_field :token_scope_list, placeholder: "read read_write", class: "mono" %>
+      <p class="hint">What a personal token may do in this app, as the app understands it. Extension tokens get the highest.</p>
+    </div>
+    <% if app.new_record? %>
+      <div class="field full">
+        <%= label_tag "app_role_list", "Roles, lowest first (one per line)" %>
+        <%= text_area_tag "app[role_list]", @role_list, rows: 4, id: "app_role_list", class: "mono" %>
+        <p class="hint">Lowercase letters, digits and underscores. More roles can be added and reordered later. With multiple roles,
+          roles are names (spaces allowed), may be left empty, and get their permissions on the app's page.</p>
+      </div>
+    <% end %>
+    <div class="field full">
+      <label class="check"><%= f.check_box :show_in_launcher %> Show in the launcher</label>
+      <% unless app.new_record? %>
+        <label class="check"><%= check_box_tag "app[disabled]", "1", app.disabled?, id: "app_disabled" %> Disabled: no tokens, API calls refused, nobody has access</label>
+      <% end %>
+    </div>
+  </div>
+  <div class="actions">
+    <%= f.submit app.new_record? ? "Create app" : "Save" %>
+    <%= link_to "Cancel", app.new_record? ? admin_apps_path : admin_app_path(app), class: "btn-secondary" %>
+  </div>
+<% end %>

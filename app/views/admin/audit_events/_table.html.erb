@@ -1,0 +1,23 @@
+<% if events.empty? %>
+  <p class="empty">No events.</p>
+<% else %>
+  <div class="table-wrap">
+    <table class="audit-table">
+      <thead><tr><th>Time</th><th>Actor</th><th>Action</th><th>Subject</th><th>App</th><th>Channel</th><th>IP</th><th>Data</th></tr></thead>
+      <tbody>
+        <% events.each do |event| %>
+          <tr>
+            <td><%= local_time(event.created_at) %></td>
+            <td><%= event.actor ? link_to(event.actor.display_name, admin_user_path(event.actor)) : tag.span("system", class: "muted") %></td>
+            <td class="mono"><%= link_to event.action, admin_audit_events_path(event: event.action) %></td>
+            <td><%= audit_subject_label(event) %></td>
+            <td><%= event.app&.name %></td>
+            <td><%= event.channel %></td>
+            <td class="mono"><%= event.ip_address %></td>
+            <td class="mono wrap audit-data"><%= event.data.present? ? event.data.to_json : "" %></td>
+          </tr>
+        <% end %>
+      </tbody>
+    </table>
+  </div>
+<% end %>

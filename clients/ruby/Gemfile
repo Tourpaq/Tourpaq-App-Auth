@@ -1,0 +1,8 @@
+source "https://rubygems.org"
+
+gemspec
+
+# Development only: the test suite, and actionpack to exercise the Rails controller concerns.
+gem "rake"
+gem "minitest"
+gem "actionpack", ">= 7.1"

@@ -1,0 +1,218 @@
+<% content_for :title, @app.name %>
+<p class="breadcrumb"><%= link_to "Apps", admin_apps_path %></p>
+<div class="section-head">
+  <div>
+    <h1 class="app-name"><%= app_icon(@app) %><%= @app.name %></h1>
+    <% if @app.description.present? %><p class="muted"><%= @app.description %></p><% end %>
+  </div>
+  <div class="actions">
+    <%= link_to "Members (#{@member_count})", members_admin_app_path(@app), class: "btn-secondary" %>
+    <%= link_to "Edit", edit_admin_app_path(@app), class: "btn-secondary" %>
+  </div>
+</div>
+
+<div class="card">
+  <dl class="facts">
+    <dt>Slug</dt><dd class="mono"><%= @app.slug %></dd>
+    <dt>Role claim</dt><dd class="mono"><%= @app.role_claim %></dd>
+    <dt>URL</dt><dd class="mono"><%= @app.url.presence || tag.span("—", class: "muted") %></dd>
+    <dt>Launcher</dt><dd><%= @app.show_in_launcher? ? "shown" : "hidden" %></dd>
+    <dt>State</dt><dd><%= @app.disabled? ? tag.span("disabled", class: "pill pill-bad") : tag.span("active", class: "pill pill-ok") %></dd>
+    <dt>Personal tokens</dt><dd><%= link_to pluralize(@token_count, "active token"), admin_tokens_path(app_id: @app.id) %></dd>
+    <dt>Token scopes</dt><dd class="mono"><%= @app.token_scopes.join(" < ") %></dd>
+    <dt>Roles per user</dt><dd><%= @app.multiple_roles? ? "several: permission sets, union of their permissions" : "one" %></dd>
+    <% if @app.multiple_roles? %>
+      <dt>Permissions claim</dt><dd class="mono"><%= @app.permissions_claim %></dd>
+      <dt>Admin permission</dt><dd><%= @app.admin_permission ? tag.span(@app.admin_permission, class: "mono") : tag.span("none (no last-administrator guard)", class: "muted") %></dd>
+      <dt>Catalogue</dt>
+      <dd><%= @app.catalogue_pushed? ? safe_join([ pluralize(@app.catalogue.size, "permission"), ", pushed ", relative_time(@app.catalogue_pushed_at) ]) : tag.span("not pushed yet", class: "muted") %></dd>
+    <% end %>
+  </dl>
+</div>
+
+<% if @unknown.any? %>
+  <div class="attention" role="alert">
+    <strong>Unknown permissions.</strong> These roles hold keys that <%= @app.name %>'s catalogue does not know. They are still
+    sent to the app, which ignores keys it does not check; remove them or ask why the app dropped them.
+    <ul>
+      <% @unknown.each do |role, keys| %>
+        <li><%= link_to role.key, edit_admin_app_role_path(@app, role) %>: <span class="unknown-permission"><%= keys.join(", ") %></span></li>
+      <% end %>
+    </ul>
+  </div>
+<% end %>
+
+<% if @app.multiple_roles? %>
+<h2>Roles</h2>
+<p class="muted small">Each role is a set of permissions. A user may hold several, directly and through groups, and gets the
+  union; a direct "no access" overrides them all. Order does not matter.</p>
+<div class="table-wrap">
+  <table class="roles-table">
+    <thead><tr><th>Role</th><th>Description</th><th>Permissions</th><th class="num">Grants</th><th></th></tr></thead>
+    <tbody>
+      <% @app.roles.sort_by { _1.key.downcase }.each do |role| %>
+        <% unknown = @unknown.fetch(role, []) %>
+        <tr>
+          <td><%= link_to role.key, edit_admin_app_role_path(@app, role) %></td>
+          <td class="wrap"><%= role.description.presence || tag.span("—", class: "muted") %></td>
+          <td>
+            <% if role.wildcard? %>
+              <span class="pill pill-warn">everything (*)</span>
+            <% else %>
+              <%= pluralize(role.permissions.size, "permission") %>
+            <% end %>
+            <% if unknown.any? %><span class="pill pill-bad" title="<%= unknown.join(', ') %>"><%= unknown.size %> unknown</span><% end %>
+          </td>
+          <td class="num"><%= @roles_in_use.fetch(role.id, 0) %></td>
+          <td class="actions-cell">
+            <%= link_to "Edit", edit_admin_app_role_path(@app, role), class: "btn-secondary btn-small" %>
+            <% if @roles_in_use.fetch(role.id, 0).zero? %>
+              <%= button_to "Remove", admin_app_role_path(@app, role), method: :delete, class: "btn-secondary btn-small danger",
+                    form: { data: { turbo_confirm: "Remove the role #{role.key} from #{@app.name}?" } } %>
+            <% end %>
+          </td>
+        </tr>
+      <% end %>
+      <% if @app.roles.empty? %>
+        <tr><td colspan="5" class="empty">No roles yet.</td></tr>
+      <% end %>
+    </tbody>
+  </table>
+</div>
+<%= form_with url: admin_app_roles_path(@app), class: "inline-form add-role" do |f| %>
+  <%= text_field_tag "role[key]", nil, id: "new_role_key", placeholder: "new role name", required: true, maxlength: 80, "aria-label": "New role name" %>
+  <%= text_field_tag "role[description]", nil, id: "new_role_description", placeholder: "what it is for", "aria-label": "New role description", class: "wide-input" %>
+  <%= f.submit "Add role", class: "btn-secondary btn-small" %>
+<% end %>
+
+<h2>Permission catalogue</h2>
+<% if @catalogue_groups.any? %>
+  <p class="muted small">Pushed by <%= @app.name %> (<span class="mono">PUT /api/v1/catalogue</span>) <%= relative_time(@app.catalogue_pushed_at) %>.
+    Each push replaces it.</p>
+  <details class="permissions catalogue">
+    <summary><%= pluralize(@app.catalogue.size, "permission") %> in <%= pluralize(@catalogue_groups.size, "group") %></summary>
+    <div class="catalogue-groups">
+      <% @catalogue_groups.each do |group, entries| %>
+        <fieldset>
+          <legend><%= group %></legend>
+          <ul class="permission-list">
+            <% entries.each do |entry| %><li><%= entry.display_label %> <code><%= entry.key %></code></li><% end %>
+          </ul>
+        </fieldset>
+      <% end %>
+    </div>
+  </details>
+<% else %>
+  <p class="empty"><%= @app.name %> has not pushed its catalogue yet (<span class="mono">PUT /api/v1/catalogue</span> with its web client).
+    Until then roles take any key.</p>
+<% end %>
+<% else %>
+<h2>Roles</h2>
+<p class="muted small">Lowest first. With group grants the highest role wins, so moving a role changes some members'
+  effective role: you see whose before it is saved. A role still used by a grant cannot be removed.</p>
+<div class="table-wrap">
+  <table class="roles-table">
+    <thead><tr><th>Rank</th><th>Role</th><th>Description</th><th class="num">Grants</th><th></th></tr></thead>
+    <tbody>
+      <% keys = @app.role_keys %>
+      <% @app.roles.each_with_index do |role, index| %>
+        <tr>
+          <td class="order-cell">
+            <% if index.positive? %>
+              <%= link_to "Lower", reorder_admin_app_roles_path(@app, keys: keys.dup.tap { |k| k[index - 1], k[index] = k[index], k[index - 1] }),
+                    class: "btn-secondary btn-small", title: "Make #{role.key} rank lower" %>
+            <% end %>
+            <% if index < keys.size - 1 %>
+              <%= link_to "Higher", reorder_admin_app_roles_path(@app, keys: keys.dup.tap { |k| k[index + 1], k[index] = k[index], k[index + 1] }),
+                    class: "btn-secondary btn-small", title: "Make #{role.key} rank higher" %>
+            <% end %>
+          </td>
+          <td><%= role_badge(role) %></td>
+          <td class="wrap">
+            <%= form_with url: admin_app_role_path(@app, role), method: :patch, class: "inline-form" do |f| %>
+              <%= text_field_tag "role[description]", role.description, id: "role_description_#{role.id}", "aria-label": "Description of #{role.key}", class: "wide-input" %>
+              <%= f.submit "Save", class: "btn-secondary btn-small" %>
+            <% end %>
+          </td>
+          <td class="num"><%= @roles_in_use.fetch(role.id, 0) %></td>
+          <td class="actions-cell">
+            <% if @roles_in_use.fetch(role.id, 0).zero? && keys.size > 1 %>
+              <%= button_to "Remove", admin_app_role_path(@app, role), method: :delete, class: "btn-secondary btn-small danger",
+                    form: { data: { turbo_confirm: "Remove the role #{role.key} from #{@app.name}?" } } %>
+            <% else %>
+              <span class="muted small" title="<%= keys.size > 1 ? 'Used by grants: reassign them first' : 'An app needs at least one role' %>">in use</span>
+            <% end %>
+          </td>
+        </tr>
+      <% end %>
+    </tbody>
+  </table>
+</div>
+<%= form_with url: admin_app_roles_path(@app), class: "inline-form add-role" do |f| %>
+  <%= text_field_tag "role[key]", nil, id: "new_role_key", placeholder: "new role key", required: true, pattern: "[a-z][a-z0-9_]*", "aria-label": "New role key" %>
+  <%= text_field_tag "role[description]", nil, id: "new_role_description", placeholder: "what it allows", "aria-label": "New role description", class: "wide-input" %>
+  <%= f.submit "Add role", class: "btn-secondary btn-small" %>
+<% end %>
+<% end %>
+
+<div class="section-head">
+  <h2>Clients</h2>
+  <%= link_to "New client", new_admin_app_client_path(@app), class: "btn-secondary btn-small" %>
+</div>
+<% if @clients.any? %>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Client id</th><th>Kind</th><th>Redirect URIs</th><th>Secrets</th><th>State</th></tr></thead>
+      <tbody>
+        <% @clients.each do |client| %>
+          <% active = client.client_secrets.select(&:active?) %>
+          <tr class="<%= 'row-muted' if client.disabled_at %>">
+            <td class="mono"><%= link_to client.client_id, admin_app_client_path(@app, client) %></td>
+            <td><%= client.kind %></td>
+            <td class="mono wrap small"><%= safe_join(client.redirect_uris, tag.br) %></td>
+            <td>
+              <% if client.web? %>
+                <% if active.empty? %>
+                  <span class="pill pill-warn">no secret</span>
+                <% else %>
+                  <%= pluralize(active.size, "active secret") %>
+                  <% if active.any?(&:expiring_soon?) %><span class="pill pill-warn">expiring</span><% end %>
+                <% end %>
+              <% else %>
+                <span class="muted">PKCE, no secret</span>
+              <% end %>
+            </td>
+            <td><%= client.disabled_at ? tag.span("disabled", class: "pill pill-bad") : tag.span("active", class: "pill pill-ok") %></td>
+          </tr>
+        <% end %>
+      </tbody>
+    </table>
+  </div>
+<% else %>
+  <p class="empty">No clients yet. The app needs a web client to sign users in.</p>
+<% end %>
+
+<h2>Grants</h2>
+<% if @grants.any? %>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>To</th><th>Role</th></tr></thead>
+      <tbody>
+        <% @grants.each do |grant| %>
+          <tr>
+            <td>
+              <% if grant.subject.is_a?(Group) %>
+                group <%= link_to grant.subject.name, admin_group_path(grant.subject) %>
+              <% else %>
+                <%= link_to grant.subject.display_name, admin_user_path(grant.subject) %> <span class="muted small">direct</span>
+              <% end %>
+            </td>
+            <td><%= role_badge(grant.app_role) %></td>
+          </tr>
+        <% end %>
+      </tbody>
+    </table>
+  </div>
+<% else %>
+  <p class="empty">No grants. Give access from a group's or a user's page.</p>
+<% end %>

@@ -1,0 +1,27 @@
+<% content_for :title, @query.present? ? "Search: #{@query}" : "Search" %>
+<div class="ix">
+  <h1>Search</h1>
+  <%= form_with url: index_search_path, method: :get, class: "ix-hero-search", data: { turbo: false } do %>
+    <input type="search" name="q" value="<%= @query %>" placeholder="Search apps, servers, dashboards and docs…" aria-label="Search" autofocus>
+    <button type="submit">Search</button>
+  <% end %>
+
+  <% if @query.blank? %>
+    <p class="empty">Type a name, a host name, an owner or a group.</p>
+  <% elsif @entries.empty? && @docs.empty? %>
+    <p class="empty">Nothing matches <strong><%= @query %></strong>.</p>
+  <% else %>
+    <% if @entries.any? %>
+      <h2><%= pluralize(@entries.size, "app or service", plural: "apps and services") %></h2>
+      <%= render "index/shared/table", entries: @entries %>
+    <% end %>
+    <% if @docs.any? %>
+      <h2><%= pluralize(@docs.size, "doc") %></h2>
+      <ul class="ix-link-list ix-link-list-lg">
+        <% @docs.each do |doc| %>
+          <li><%= link_to doc.title, doc.path %><% if doc.summary.present? %><span class="ix-link-note"><%= doc.summary %></span><% end %></li>
+        <% end %>
+      </ul>
+    <% end %>
+  <% end %>
+</div>

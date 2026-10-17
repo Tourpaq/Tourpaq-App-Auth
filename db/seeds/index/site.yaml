@@ -1,0 +1,38 @@
+# The index's seed content (SPECS.md §24.3), from Tourpaq-App-WWW's db/seeds/content: loaded once, into an empty
+# index (Index::SeedContent, from db/seeds.rb). After that the database is the source of truth and everything is
+# edited on the admin host (Index content). Production gets WWW's live content through auth:import_index instead.
+
+title: Tourpaq DK Home
+brand: TP DK Home
+tagline: Everything we use, and where to find it
+footer:
+
+# Sections, in menu order. layout: cards (on the front page) or table (a page of its own with a compact table).
+# groups: who sees it (auth groups); without, everyone signed in. WWW's "technical" groups are the table sections,
+# for DK Tech and RO DevOps.
+categories:
+  - { name: Apps,           layout: cards, description: Our own internal applications. }
+  - { name: Reporting,      layout: cards, description: Reports and dashboards for the business. }
+  - { name: Infrastructure, layout: table, groups: [DK Tech, RO DevOps], description: "Hosting, deployment and the platforms underneath." }
+  - { name: DevOps,         layout: table, groups: [DK Tech, RO DevOps], description: "Source, dashboards, logs, traces and metrics." }
+  - { name: Databases,      layout: table, groups: [DK Tech, RO DevOps], description: SQL Server masters and replicas per environment. }
+  - { name: Integrations,   layout: table, groups: [DK Tech, RO DevOps], description: Services that other systems talk to. }
+
+# How an entry is reached on the network, and how you sign in.
+#   tone: ok | warn | danger | neutral   (colours the dot on the pill)
+access_levels:
+  public:          { label: Public access,             tone: warn }
+  netbird:         { label: NetBird access,            tone: ok }
+  netbird-hetzner: { label: "NetBird: Hetzner → Azure", tone: neutral }
+  azure-vpn:       { label: Azure VPN access,          tone: ok }
+
+login_methods:
+  sso:       { label: SSO login,       tone: ok }
+  1password: { label: 1Password login, tone: ok }
+  limited:   { label: Limited login,   tone: warn }
+  none:      { label: No login,        tone: warn }
+
+# Pins the order of the folders under docs/.
+docs_sections:
+  - deployment
+  - getting-started

@@ -1,0 +1,26 @@
+<% content_for :title, "Index site settings" %>
+<%= render "admin/index_content/tabs" %>
+<h1>Site settings</h1>
+<%= form_with model: @site, url: admin_index_site_path, method: :patch, class: "card ix-admin-form" do |f| %>
+  <%= render "admin/shared/errors", record: @site %>
+  <div class="ix-form-grid">
+    <div class="field">
+      <%= f.label :title %>
+      <%= f.text_field :title, required: true %>
+      <p class="hint">The front page heading and the browser tab.</p>
+    </div>
+    <div class="field">
+      <%= f.label :brand %>
+      <%= f.text_field :brand, placeholder: "Short name, e.g. in the extension" %>
+    </div>
+    <div class="field full">
+      <%= f.label :tagline %>
+      <%= f.text_field :tagline %>
+    </div>
+    <div class="field full">
+      <%= f.label :footer %>
+      <%= f.text_field :footer, placeholder: "Optional line at the bottom of the front page" %>
+    </div>
+  </div>
+  <div class="actions"><%= f.submit "Save" %></div>
+<% end %>

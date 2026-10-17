@@ -1,0 +1,42 @@
+{
+  "manifest_version": 3,
+  "name": "Tourpaq Index",
+  "short_name": "Tourpaq Index",
+  "description": "Every app, server, dashboard and doc from index.app.journeybooking.eu, searchable in the side panel.",
+  "version": "2.0.0",
+  "minimum_chrome_version": "116",
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA1OVompXIhlzFgmLrX3y/eEwA9v2uqZaTgW6ClSfvBz0boMFon1y0mhXpkcvHS9YN34adlyj4IbkUhpwVjAMfGGKzKZGLYRxCFmIjRmAwRqbY72sgoHiOyCu8/uuppr/aP9C9eJdtqzZZkh3+MWGHfsxJS0eqIhcHotJ4wDC5Du2CPgu/AnOcosTheJ45noQef+HT4BZHUcfSJhFtI8RDDXAeJHM/E0JNS1iJ2JMaLUFNv8AZfCBUyCIIfPbzgYEAOqiy0mSWBKWXwKRp7fGUNLvt9SI9XDiUNOf2fetmJWyHnuOd3+3unG8NePUKqiT8WqodxwLpTa4gSC7kSofu0QIDAQAB",
+  "icons": {
+    "16": "icons/icon-16.png",
+    "32": "icons/icon-32.png",
+    "48": "icons/icon-48.png",
+    "128": "icons/icon-128.png"
+  },
+  "action": {
+    "default_title": "Tourpaq Index",
+    "default_icon": {
+      "16": "icons/icon-16.png",
+      "32": "icons/icon-32.png"
+    }
+  },
+  "side_panel": {
+    "default_path": "panel.html"
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "commands": {
+    "toggle-panel": {
+      "suggested_key": { "default": "Ctrl+Shift+Space", "mac": "Command+Shift+Space" },
+      "description": "Open or close Tourpaq Index"
+    }
+  },
+  "permissions": ["sidePanel", "storage", "identity"],
+  "host_permissions": [
+    "https://index.app.journeybooking.eu/*",
+    "https://auth.app.journeybooking.eu/*",
+    "http://index.localhost:3050/*",
+    "http://auth.localhost:3050/*"
+  ],
+  "optional_host_permissions": ["https://*/*", "http://*/*"]
+}

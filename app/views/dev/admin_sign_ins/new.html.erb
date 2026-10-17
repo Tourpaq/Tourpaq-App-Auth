@@ -1,0 +1,13 @@
+<% content_for :title, "Admin sign-in (development)" %>
+<h1>Admin sign-in</h1>
+<p class="muted">Development only: a stand-in until the admin host signs in through the auth app's own
+  OIDC provider (SPECS.md §11.2).</p>
+<% @users.each do |user| %>
+  <%= button_to dev_admin_sign_in_path, params: { email: user.email }, class: "btn-secondary btn-block", form: { data: { turbo: false } } do %>
+    <%= user.display_name %> <span class="muted small"><%= user.email %></span>
+  <% end %>
+<% end %>
+<%= form_tag dev_admin_sign_in_path, method: :post, data: { turbo: false } do %>
+  <div class="field"><%= label_tag :email, "Or any email" %><%= email_field_tag :email, nil, required: true %></div>
+  <button type="submit" class="btn-block">Sign in</button>
+<% end %>

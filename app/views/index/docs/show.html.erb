@@ -1,0 +1,23 @@
+<% content_for :title, @doc.title %>
+<div class="ix">
+  <div class="ix-doc-layout">
+    <article class="ix-doc-body">
+      <p class="ix-crumb">Documentation<% if @doc.doc_section %> <span class="ix-crumb-sep">/</span> <%= @doc.doc_section.title %><% end %></p>
+      <h1><%= @doc.title %></h1>
+      <% if @doc.summary.present? %><p class="muted ix-lede"><%= @doc.summary %></p><% end %>
+      <div class="ix-prose"><%= @body.html %></div>
+      <p class="ix-page-footer muted">
+        Last changed <%= index_time_ago(@doc.updated_at) %><% if current_user.admin? %> · <%= link_to "Edit this page", admin_host_url("/index/docs/#{@doc.id}/edit") %><% end %>
+      </p>
+    </article>
+
+    <% if @body.toc.size >= 3 %>
+      <aside class="ix-toc">
+        <div class="ix-toc-title">On this page</div>
+        <% @body.toc.each do |item| %>
+          <a class="ix-toc-item ix-toc-l<%= item[:level] %>" href="#<%= item[:id] %>"><%= item[:name] %></a>
+        <% end %>
+      </aside>
+    <% end %>
+  </div>
+</div>

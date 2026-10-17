@@ -1,0 +1,14 @@
+<%# The index content screens' tabs (WWW's admin nav), on the admin host. %>
+<p class="breadcrumb"><%= link_to "Index content", admin_index_root_path %> · <%= link_to "Open the index ↗", index_host_url %></p>
+<nav class="ix-tabs">
+  <% [ [ "Overview", admin_index_root_path, "admin/index_content/dashboard" ],
+       [ "Entries", admin_index_entries_path, "admin/index_content/entries" ],
+       [ "Sections", admin_index_sections_path, "admin/index_content/sections" ],
+       [ "Docs", admin_index_docs_path, "admin/index_content/docs" ],
+       [ "Doc sections", admin_index_doc_sections_path, "admin/index_content/doc_sections" ],
+       [ "Access levels", admin_index_access_levels_path, "admin/index_content/access_levels" ],
+       [ "Login methods", admin_index_login_methods_path, "admin/index_content/login_methods" ],
+       [ "Site", edit_admin_index_site_path, "admin/index_content/sites" ] ].each do |label, path, controller| %>
+    <%= link_to label, path, class: "ix-tab#{' active' if controller_path == controller}" %>
+  <% end %>
+</nav>

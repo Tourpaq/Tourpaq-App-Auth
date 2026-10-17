@@ -1,0 +1,118 @@
+<%= form_with model: [ :admin, entry ], class: "ix-admin-form" do |f| %>
+  <%= render "admin/shared/errors", record: entry %>
+
+  <fieldset>
+    <legend>The card</legend>
+    <div class="ix-form-grid">
+      <div class="field">
+        <%= f.label :name %>
+        <%= f.text_field :name, required: true %>
+      </div>
+      <div class="field">
+        <%= f.label :section_id, "Section" %>
+        <%= f.collection_select :section_id, Index::Section.menu_order, :id, :name, { include_blank: "Not in a section" } %>
+      </div>
+      <div class="field full">
+        <%= f.label :description %>
+        <%= f.text_field :description, required: true %>
+        <p class="hint">One sentence. Keep it to a line so the cards stay even.</p>
+      </div>
+      <div class="field">
+        <%= f.label :url, "URL" %>
+        <%= f.url_field :url, placeholder: "https://…" %>
+        <p class="hint">Where it runs. Becomes the <strong>Open</strong> button. Leave empty for things that aren't web pages.</p>
+      </div>
+      <div class="field">
+        <%= f.label :address %>
+        <%= f.text_field :address, placeholder: "sql-p-we-01.tourpaq.com" %>
+        <p class="hint">A host name or IP range, e.g. the NetBird resource. Shown as copyable text.</p>
+      </div>
+      <div class="field">
+        <%= f.label :access_level_id, "Access" %>
+        <%= f.collection_select :access_level_id, Index::AccessLevel.ordered, :id, :label, { include_blank: "Not recorded" } %>
+        <p class="hint">How it's reached on the network. <%= link_to "Edit the list", admin_index_access_levels_path %></p>
+      </div>
+      <div class="field">
+        <%= f.label :login_method_id, "Login" %>
+        <%= f.collection_select :login_method_id, Index::LoginMethod.ordered, :id, :label, { include_blank: "Not recorded" } %>
+        <p class="hint">How you sign in. <%= link_to "Edit the list", admin_index_login_methods_path %></p>
+      </div>
+      <div class="field">
+        <%= f.label :status %>
+        <%= f.select :status, Index::Entry::STATUSES %>
+      </div>
+      <div class="field">
+        <%= f.label :owner %>
+        <%= f.text_field :owner, placeholder: "Who to ask about it" %>
+      </div>
+      <div class="field">
+        <%= f.label :icon %>
+        <%= f.text_field :icon, placeholder: "📈 or https://…/favicon.svg" %>
+        <p class="hint">A single emoji or an image URL. Leave empty for an initials tile.</p>
+      </div>
+      <div class="field">
+        <%= f.label :repo, "Repository" %>
+        <%= f.url_field :repo, placeholder: "https://github.com/…" %>
+      </div>
+      <div class="field">
+        <%= f.label :position, "Order" %>
+        <%= f.number_field :position %>
+        <p class="hint">Lower sorts first within the section.</p>
+      </div>
+      <div class="field">
+        <%= f.label :slug, "URL slug" %>
+        <%= f.text_field :slug, placeholder: "made from the name" %>
+      </div>
+    </div>
+  </fieldset>
+
+  <fieldset>
+    <legend>Who sees it</legend>
+    <div class="field">
+      <%= f.label :app_id, "Tied to an app" %>
+      <%= f.collection_select :app_id, App.ordered, :id, :name, { include_blank: "Not an app of ours" } %>
+      <p class="hint">An app's entry is shown only to users with access to that app, with their role. Then the visibility below is not used.</p>
+    </div>
+    <div class="field">
+      <%= f.label :visibility %>
+      <%= f.select :visibility, [ [ "Everyone signed in", "everyone" ], [ "Only these groups", "groups" ] ] %>
+    </div>
+    <div class="field">
+      <span class="hint">Groups (with “Only these groups”)</span>
+      <div class="ix-group-choices">
+        <%= f.collection_check_boxes :group_ids, Group.ordered, :id, :name do |b| %>
+          <label class="check"><%= b.check_box %> <%= b.text %></label>
+        <% end %>
+      </div>
+      <p class="hint">An entry in a section is shown only when its section is shown too.</p>
+    </div>
+  </fieldset>
+
+  <fieldset data-controller="index-links">
+    <legend>Links</legend>
+    <p class="hint">Extra destinations inside the same service: dashboards, saved searches, admin screens. Top one first.</p>
+    <div data-index-links-target="list">
+      <%= f.fields_for :links do |lf| %>
+        <%= render "admin/index_content/entries/link_fields", f: lf %>
+      <% end %>
+    </div>
+    <template data-index-links-target="template">
+      <%= f.fields_for :links, Index::Link.new, child_index: "NEW_LINK" do |lf| %>
+        <%= render "admin/index_content/entries/link_fields", f: lf %>
+      <% end %>
+    </template>
+    <button type="button" class="btn-secondary btn-small" data-action="index-links#add">+ Add a link</button>
+  </fieldset>
+
+  <fieldset>
+    <legend>Details page</legend>
+    <%= f.text_area :body, rows: 14, class: "ix-markdown", placeholder: "Optional. Markdown. What it is for, who uses it, how to run it locally, what breaks." %>
+    <p class="hint">Anything written here becomes a <strong>Details</strong> page linked from the card. Markdown: <code>## Heading</code>, <code>**bold**</code>, <code>[link](https://…)</code>, <code>```</code> code blocks, tables. It is sanitised: raw HTML cannot run script.</p>
+  </fieldset>
+
+  <div class="actions">
+    <%= f.submit entry.persisted? ? "Save" : "Add" %>
+    <%= link_to "Cancel", admin_index_entries_path, class: "btn-secondary" %>
+    <% if entry.persisted? %><%= link_to "View on the index ↗", index_host_url("/apps/#{entry.to_param}") %><% end %>
+  </div>
+<% end %>

@@ -1,0 +1,35 @@
+<%= form_with model: [ :admin, doc ], class: "ix-admin-form" do |f| %>
+  <%= render "admin/shared/errors", record: doc %>
+  <div class="ix-form-grid">
+    <div class="field">
+      <%= f.label :title %>
+      <%= f.text_field :title, required: true %>
+    </div>
+    <div class="field">
+      <%= f.label :doc_section_id, "Section" %>
+      <%= f.collection_select :doc_section_id, Index::DocSection.ordered, :id, :title, { include_blank: "No section" } %>
+    </div>
+    <div class="field full">
+      <%= f.label :summary %>
+      <%= f.text_field :summary, placeholder: "Optional. Shown under the heading." %>
+    </div>
+    <div class="field">
+      <%= f.label :position, "Order" %>
+      <%= f.number_field :position %>
+    </div>
+    <div class="field">
+      <%= f.label :slug, "URL slug" %>
+      <%= f.text_field :slug, placeholder: "made from the title" %>
+    </div>
+  </div>
+  <div class="field">
+    <%= f.label :body, "Text (markdown)" %>
+    <%= f.text_area :body, rows: 28, class: "ix-markdown" %>
+    <p class="hint">Markdown: <code>## Heading</code> (three or more add an <em>On this page</em> menu), <code>**bold**</code>, <code>[link](/docs/…)</code>, <code>```</code> code blocks, tables. It is sanitised: raw HTML cannot run script.</p>
+  </div>
+  <div class="actions">
+    <%= f.submit doc.persisted? ? "Save" : "Add" %>
+    <%= link_to "Cancel", admin_index_docs_path, class: "btn-secondary" %>
+    <% if doc.persisted? %><%= link_to "View on the index ↗", index_host_url(doc.path) %><% end %>
+  </div>
+<% end %>

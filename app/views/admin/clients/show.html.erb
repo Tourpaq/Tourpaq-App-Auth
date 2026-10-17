@@ -1,0 +1,62 @@
+<% content_for :title, @client.client_id %>
+<p class="breadcrumb"><%= link_to "Apps", admin_apps_path %> / <%= link_to @app.name, admin_app_path(@app) %></p>
+<div class="section-head">
+  <div>
+    <h1 class="mono"><%= @client.client_id %></h1>
+    <p class="muted"><%= @client.name %> · <%= @client.web? ? "web app (confidential)" : "browser extension (public, PKCE)" %>
+      <% if @client.disabled_at %><span class="pill pill-bad">disabled</span><% end %></p>
+  </div>
+  <div class="actions"><%= link_to "Edit", edit_admin_app_client_path(@app, @client), class: "btn-secondary" %></div>
+</div>
+
+<div class="card">
+  <dl class="facts">
+    <dt>Redirect URIs</dt>
+    <dd class="mono wrap"><%= @client.redirect_uris.any? ? safe_join(@client.redirect_uris, tag.br) : tag.span("none yet", class: "muted") %></dd>
+    <% if @client.web? %>
+      <dt>Post-logout URIs</dt>
+      <dd class="mono wrap"><%= @client.post_logout_redirect_uris.any? ? safe_join(@client.post_logout_redirect_uris, tag.br) : tag.span("none", class: "muted") %></dd>
+    <% end %>
+    <dt>Issuer</dt><dd class="mono"><%= AuthHosts.auth_url %></dd>
+  </dl>
+</div>
+
+<% if @client.web? %>
+  <h2>Secrets</h2>
+  <p class="muted small">Shown once when created, stored only as a hash. A client can hold two active secrets: to rotate,
+    create the new one, deploy <%= @app.name %> with it, then delete the old one.</p>
+  <% if @secrets.any? %>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Secret</th><th>Created</th><th>By</th><th>Expiry</th><th>Last used</th><th></th></tr></thead>
+        <tbody>
+          <% @secrets.each do |secret| %>
+            <tr class="<%= 'row-muted' if secret.expired? %>">
+              <td class="mono"><%= secret.hint %>…</td>
+              <td><%= local_time(secret.created_at) %></td>
+              <td><%= secret.created_by&.display_name %></td>
+              <td><%= expiry_pill(secret.expires_at, warn: ClientSecret::WARN_BEFORE) %></td>
+              <td><%= secret.last_used_at ? relative_time(secret.last_used_at) : tag.span("never", class: "muted") %></td>
+              <td class="actions-cell">
+                <%= button_to "Delete", admin_app_client_secret_path(@app, @client, secret), method: :delete, class: "btn-secondary btn-small danger",
+                      form: { data: { turbo_confirm: "Delete secret #{secret.hint}…? #{@app.name} can no longer authenticate with it." } } %>
+              </td>
+            </tr>
+          <% end %>
+        </tbody>
+      </table>
+    </div>
+  <% else %>
+    <p class="empty">No secret yet: <%= @app.name %> cannot sign users in until it has one.</p>
+  <% end %>
+
+  <% if @client.active_secrets.count < Client::MAX_ACTIVE_SECRETS %>
+    <%= form_with url: admin_app_client_secrets_path(@app, @client), class: "inline-form", data: { turbo: false } do |f| %>
+      <%= label_tag :expires_in_days, "Expires", class: "inline-label" %>
+      <%= select_tag :expires_in_days, options_for_select([ [ "in 1 year", "365" ], [ "in 2 years", "730" ], [ "in 90 days", "90" ], [ "never", "never" ] ], "365") %>
+      <%= f.submit @secrets.any?(&:active?) ? "Create a second secret (rotate)" : "Create secret" %>
+    <% end %>
+  <% else %>
+    <p class="muted">Two active secrets: delete the old one before creating another.</p>
+  <% end %>
+<% end %>

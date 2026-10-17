@@ -1,0 +1,34 @@
+irm_viewer:
+  app: irm
+  key: viewer
+  position: 1
+
+irm_responder:
+  app: irm
+  key: responder
+  position: 2
+
+irm_editor:
+  app: irm
+  key: editor
+  position: 3
+
+irm_admin:
+  app: irm
+  key: admin
+  position: 4
+
+kpi_viewer:
+  app: kpi
+  key: viewer
+  position: 1
+
+kpi_editor:
+  app: kpi
+  key: editor
+  position: 2
+
+kpi_admin:
+  app: kpi
+  key: admin
+  position: 3

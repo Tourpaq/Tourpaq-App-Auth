@@ -1,0 +1,25 @@
+<% content_for :title, "Audit log" %>
+<h1>Audit log</h1>
+<p class="muted">Every sign-in and every change: who, what, through which channel. Newest first, kept indefinitely.</p>
+
+<%= form_with url: admin_audit_events_path, method: :get, class: "filters", data: { controller: "submit-on-change" } do |f| %>
+  <div>
+    <%= f.label :user_id, "User" %>
+    <%= f.select :user_id, options_from_collection_for_select(@users, :id, :display_name, params[:user_id]), include_blank: "Anyone" %>
+  </div>
+  <div>
+    <%= f.label :app_id, "App" %>
+    <%= f.select :app_id, options_from_collection_for_select(@apps, :id, :name, params[:app_id]), include_blank: "Any app" %>
+  </div>
+  <div>
+    <%= f.label :event, "Action (or its start, e.g. grant.)" %>
+    <%= f.search_field :event, value: params[:event], list: "audit-actions", placeholder: "grant." %>
+    <datalist id="audit-actions"><% @actions.each do |action| %><option value="<%= action %>"></option><% end %></datalist>
+  </div>
+  <div><%= f.submit "Filter" %></div>
+<% end %>
+
+<%= render "admin/audit_events/table", events: @events %>
+<% if @next_before %>
+  <p><%= link_to "Older", admin_audit_events_path(params.permit(:user_id, :app_id, :event).merge(before: @next_before)), class: "btn-secondary" %></p>
+<% end %>

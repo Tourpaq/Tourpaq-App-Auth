@@ -1,0 +1,19 @@
+<% content_for :title, @section.name %>
+<div class="ix">
+  <p class="ix-crumb"><%= link_to "Home", index_root_path %> <span class="ix-crumb-sep">/</span> <%= @section.table? ? "Technical" : "Apps and services" %></p>
+  <h1><%= @section.name %></h1>
+  <% if @section.description.present? %><p class="muted ix-lede"><%= @section.description %></p><% end %>
+
+  <% if @entries.empty? %>
+    <p class="empty">Nothing in this group yet.</p>
+  <% else %>
+    <div data-controller="index-filter">
+      <%= render "index/shared/filter", count: @entries.size if @entries.size > 6 %>
+      <% if @section.table? %>
+        <%= render "index/shared/table", entries: @entries %>
+      <% else %>
+        <div class="ix-grid"><%= render partial: "index/shared/card", collection: @entries, as: :entry %></div>
+      <% end %>
+    </div>
+  <% end %>
+</div>

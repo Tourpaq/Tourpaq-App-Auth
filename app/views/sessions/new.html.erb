@@ -1,0 +1,15 @@
+<% content_for :title, "Sign in" %>
+<h1>Sign in</h1>
+<p class="muted">Use your Tourpaq Microsoft account. It signs you in to all the journeybooking apps.</p>
+
+<% if @fresh %><p class="hint">Microsoft will ask for your password again for this sign-in.</p><% end %>
+<%= form_tag "/auth/entra_id", method: :post, class: "signin-form", data: ({ turbo: false, controller: ("autosubmit" if @auto) }.compact) do %>
+  <button type="submit" class="btn-block">Sign in with Microsoft</button>
+<% end %>
+
+<% if Rails.configuration.x.auth.entra_client_id.blank? %>
+  <p class="hint">Entra ID is not configured here (ENTRA_TENANT_ID, ENTRA_CLIENT_ID, ENTRA_CLIENT_SECRET).</p>
+<% end %>
+<% if FakeIdentity.enabled? %>
+  <p class="hint dev-note">Development: <%= link_to "sign in with the fake identity provider", dev_sign_in_path %>.</p>
+<% end %>

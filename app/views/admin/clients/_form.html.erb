@@ -1,0 +1,43 @@
+<%= form_with model: client, url: (client.new_record? ? admin_app_clients_path(app) : admin_app_client_path(app, client)), scope: :client, class: "card" do |f| %>
+  <%= render "admin/shared/errors", record: client %>
+  <div class="form-grid">
+    <div class="field">
+      <%= f.label :client_id, "Client id (cannot change later)" %>
+      <% if client.new_record? %>
+        <%= f.text_field :client_id, required: true, class: "mono", pattern: "[a-z0-9]+(-[a-z0-9]+)*" %>
+      <% else %>
+        <input type="text" value="<%= client.client_id %>" disabled aria-label="Client id" class="mono">
+      <% end %>
+    </div>
+    <div class="field">
+      <%= f.label :name %>
+      <%= f.text_field :name %>
+    </div>
+    <% if client.new_record? %>
+      <div class="field">
+        <%= f.label :kind %>
+        <%= f.select :kind, [ [ "Web app (confidential, client secret)", "web" ], [ "Browser extension (public, PKCE)", "extension" ] ] %>
+      </div>
+    <% end %>
+    <div class="field full">
+      <%= f.label :redirect_uris, "Redirect URIs, one per line (exact match; https, or http on localhost)" %>
+      <%= f.text_area :redirect_uris, value: client.redirect_uris.join("\n"), rows: 3, class: "mono" %>
+      <p class="hint">Web: e.g. https://irm.app.journeybooking.eu/sso/callback. Extension: https://&lt;extension-id&gt;.chromiumapp.org/</p>
+    </div>
+    <% if client.new_record? || client.web? %>
+      <div class="field full">
+        <%= f.label :post_logout_redirect_uris, "Post-logout redirect URIs (web clients only)" %>
+        <%= f.text_area :post_logout_redirect_uris, value: client.post_logout_redirect_uris.join("\n"), rows: 2, class: "mono" %>
+      </div>
+    <% end %>
+    <% unless client.new_record? %>
+      <div class="field full">
+        <label class="check"><%= check_box_tag "client[disabled]", "1", client.disabled_at.present?, id: "client_disabled" %> Disabled: no sign-ins, no API calls</label>
+      </div>
+    <% end %>
+  </div>
+  <div class="actions">
+    <%= f.submit client.new_record? ? "Create client" : "Save" %>
+    <%= link_to "Cancel", client.new_record? ? admin_app_path(app) : admin_app_client_path(app, client), class: "btn-secondary" %>
+  </div>
+<% end %>

@@ -1,0 +1,19 @@
+#!/usr/bin/env bash
+# Runs the tourpaq_auth gem's tests in Docker, without the host Ruby.
+#
+#   clients/ruby/bin/docker-test                         # bundle install + the whole suite
+#   clients/ruby/bin/docker-test bundle exec ruby -Ilib -Itest test/access_test.rb
+#
+# Image "tourpaq-auth-client-test" (Dockerfile.test, ruby:4.0.7-slim), gems in the
+# "tourpaq_auth_client_bundle" volume.
+set -euo pipefail
+cd "$(dirname "$0")/.."
+
+docker build -q -t tourpaq-auth-client-test - < Dockerfile.test >/dev/null
+
+args=(--rm -v "$PWD":/gem -w /gem -v tourpaq_auth_client_bundle:/usr/local/bundle)
+[ -t 0 ] && args+=(-it)
+if [ $# -eq 0 ]; then
+  set -- sh -c "bundle install --quiet && bundle exec rake test"
+fi
+exec docker run "${args[@]}" tourpaq-auth-client-test "$@"

@@ -1,0 +1,4 @@
+<% content_for :title, "Edit #{@client.client_id}" %>
+<p class="breadcrumb"><%= link_to "Apps", admin_apps_path %> / <%= link_to @app.name, admin_app_path(@app) %> / <%= link_to @client.client_id, admin_app_client_path(@app, @client) %></p>
+<h1>Edit <%= @client.client_id %></h1>
+<%= render "form", app: @app, client: @client %>

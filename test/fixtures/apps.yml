@@ -1,0 +1,15 @@
+irm:
+  slug: irm
+  name: IRM
+  description: Incident response.
+  url: https://irm.app.journeybooking.eu
+  role_claim: irm_role
+  show_in_launcher: true
+
+kpi:
+  slug: kpi
+  name: KPI
+  description: Key figures.
+  url: https://kpi.app.journeybooking.eu
+  role_claim: kpi_role
+  show_in_launcher: true

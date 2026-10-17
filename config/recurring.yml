@@ -1,0 +1,24 @@
+# Recurring jobs run by Solid Queue's scheduler (inside Puma), SPECS.md §15, §19.
+#   cleanup        codes, sessions past their limits, OAuth tokens without access, old rows
+#   token_expiry   token.expired audit events for personal tokens that ran out
+#   heartbeat      the IRM's heartbeat integration (IRM_HEARTBEAT_URL; nothing when unset)
+
+default: &default
+  cleanup:
+    class: CleanupJob
+    schedule: every hour at minute 7
+  token_expiry:
+    class: TokenExpiryJob
+    schedule: every hour at minute 17
+  heartbeat:
+    class: HeartbeatJob
+    schedule: every 5 minutes
+
+development:
+  <<: *default
+
+production:
+  <<: *default
+  clear_solid_queue_finished_jobs:
+    command: "SolidQueue::Job.clear_finished_in_batches(sleep_between_batches: 0.3)"
+    schedule: every hour at minute 12

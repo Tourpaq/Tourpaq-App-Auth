@@ -1,0 +1,6 @@
+<% content_for :title, "Edit #{@section.name_in_database}" %>
+<%= render "admin/index_content/tabs" %>
+<h1><%= @section.name_in_database %></h1>
+<%= render "form", section: @section %>
+<%= render "admin/index_content/delete", label: "section “#{@section.name_in_database}”", url: admin_index_section_path(@section),
+           note: "Its #{pluralize(@section.entries.size, 'entry', plural: 'entries')} are kept, just not in a section." %>

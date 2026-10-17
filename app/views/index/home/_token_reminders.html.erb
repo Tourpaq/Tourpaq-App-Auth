@@ -1,0 +1,12 @@
+<%# Personal tokens expiring within 7 days (SPECS.md §9.1). %>
+<% if tokens.any? %>
+  <div class="reminder" role="status">
+    <strong><%= pluralize(tokens.size, "token") %> <%= tokens.size == 1 ? "expires" : "expire" %> soon.</strong>
+    <ul class="plain-list">
+      <% tokens.each do |token| %>
+        <li><%= token.name %> for <%= token.app.name %> (<%= token.scope %>) expires <%= relative_time(token.expires_at) %>.</li>
+      <% end %>
+    </ul>
+    <p class="small"><%= link_to "Create a new token", index_tokens_path %> before then, and revoke the old one when you have switched.</p>
+  </div>
+<% end %>

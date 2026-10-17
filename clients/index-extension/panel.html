@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <title>Tourpaq Index</title>
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <link rel="stylesheet" href="panel.css">
+    <script src="panel.js" type="module"></script>
+  </head>
+  <body>
+    <header class="top">
+      <div class="brand">
+        <img src="icons/icon-32.png" alt="" width="18" height="18">
+        <a id="brand" href="https://index.app.journeybooking.eu/" target="_blank">Tourpaq Index</a>
+      </div>
+      <input id="q" type="search" placeholder="Search…  /" autocomplete="off" spellcheck="false"
+             aria-label="Search apps, services and docs">
+    </header>
+
+    <div id="notice" class="notice" hidden></div>
+    <section id="signin" class="signin" hidden>
+      <p>The index shows the apps and services you may use. Sign in with your Tourpaq (Microsoft) account.</p>
+      <button type="button" id="signin-button">Sign in with Tourpaq</button>
+      <p id="signin-error" class="error" hidden></p>
+    </section>
+    <main id="list" aria-live="polite"></main>
+
+    <footer class="foot">
+      <span id="updated" class="muted"></span>
+      <span class="foot-actions">
+        <button type="button" id="refresh" title="Fetch the list again">Refresh</button>
+        <button type="button" id="settings-toggle" aria-expanded="false">Settings</button>
+      </span>
+      <div id="account" class="account" hidden>
+        <span id="who" class="muted"></span>
+        <button type="button" id="signout">Sign out</button>
+      </div>
+      <form id="settings" class="settings" hidden>
+        <label for="server">Index address</label>
+        <input id="server" type="url" required placeholder="https://index.app.journeybooking.eu">
+        <div class="settings-actions">
+          <button type="submit">Save</button>
+          <button type="button" id="server-reset">Use default</button>
+        </div>
+        <p class="muted">You sign in at the matching auth host (index.… → auth.…), e.g. http://index.localhost:3050 for a local auth app.</p>
+        <p id="settings-error" class="error" hidden></p>
+      </form>
+    </footer>
+  </body>
+</html>

@@ -1,0 +1,26 @@
+<% content_for :title, "Apps" %>
+<div class="section-head">
+  <h1>Apps</h1>
+  <%= link_to "New app", new_admin_app_path, class: "button" %>
+</div>
+<div class="table-wrap">
+  <table>
+    <thead><tr><th>App</th><th>Slug</th><th>Roles (lowest first)</th><th>Clients</th><th class="num">Members</th><th class="num">Tokens</th><th>State</th></tr></thead>
+    <tbody>
+      <% @apps.each do |app| %>
+        <tr class="<%= 'row-muted' if app.disabled? %>">
+          <td><span class="app-name"><%= app_icon(app, css: "app-icon app-icon-small") %><%= link_to app.name, admin_app_path(app) %></span></td>
+          <td class="mono"><%= app.slug %></td>
+          <td class="wrap"><%= app.multiple_roles? ? safe_join([ app.role_keys.sort_by(&:downcase).join(", ").presence || "—", " ", tag.span("several per user", class: "pill pill-muted") ]) : app.role_keys.join(" < ") %></td>
+          <td class="mono wrap"><%= app.clients.map(&:client_id).sort.join(", ") %></td>
+          <td class="num"><%= link_to @member_counts[app.id], members_admin_app_path(app) %></td>
+          <td class="num"><%= link_to @token_counts.fetch(app.id, 0), admin_tokens_path(app_id: app.id) %></td>
+          <td>
+            <% if app.disabled? %><span class="pill pill-bad">disabled</span><% else %><span class="pill pill-ok">active</span><% end %>
+            <% unless app.show_in_launcher? %><span class="pill pill-muted">hidden</span><% end %>
+          </td>
+        </tr>
+      <% end %>
+    </tbody>
+  </table>
+</div>

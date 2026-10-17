@@ -1,0 +1,120 @@
+# Deploy (Coolify on Hetzner, Docker Compose resource):  docker compose up -d --build
+#
+# Same conventions as the IRM, Logs Analyzer and Azure Cost: environment variables are declared with
+# ${VAR} interpolation (works with a local ./.env and with Coolify's Environment Variables UI),
+# secrets are never baked into the image.
+#
+# ONE service, `web` (port 3050), serving the THREE domains of the one app (SPECS.md §24.1, §19), all behind NetBird:
+#   auth.app.journeybooking.eu    the issuer: Entra sign-in, OIDC, the API, introspection      (APP_URL)
+#   index.app.journeybooking.eu   the index, profile, personal tokens                        (INDEX_URL)
+#   admin.app.journeybooking.eu   admin UI only, limited to admins in NetBird               (ADMIN_URL)
+# In Coolify, put all three domains on this service; Traefik routes them to port 3050 and the app tells
+# them apart by host. (home.app.journeybooking.eu is the Dashboard's, not this app's.)
+# Apps on a shared Docker network may reach the back-channel by container name: list that host:port in
+# AUTH_INTERNAL_HOSTS (e.g. auth:3050) and give the app LOGIN_INTERNAL_URL=http://auth:3050.
+#
+# Solid Queue runs inside Puma (SOLID_QUEUE_IN_PUMA): the jobs are small (cleanup, expiry reminders,
+# heartbeat). The database is the Tourpaq App Platform's PostgreSQL (DATABASE_URL). ONE database:
+# the job queue's tables live in it too, so `bin/create-app tourpaq_auth` is the whole setup.
+#
+# No host port is published: only the proxy (and containers on a shared Docker network, through
+# AUTH_INTERNAL_HOSTS) reaches the app. A published port would let anyone who can reach the server ask for the
+# admin host by name, past NetBird. To try the image locally, add `ports: ["3050:3050"]` (and FORCE_SSL=false).
+services:
+  web:
+    build: .
+    restart: unless-stopped
+    expose:
+      - "3050"
+    environment:
+      # --- Rails (required in production for signing cookies) ---
+      SECRET_KEY_BASE: "${SECRET_KEY_BASE:?Set SECRET_KEY_BASE in .env (generate with: openssl rand -hex 64)}"
+      # --- The three hosts (SPECS.md §24.1). APP_URL is the issuer, exactly. ---
+      APP_URL: "${APP_URL:-https://auth.app.journeybooking.eu}"
+      INDEX_URL: "${INDEX_URL:-https://index.app.journeybooking.eu}"
+      ADMIN_URL: "${ADMIN_URL:-https://admin.app.journeybooking.eu}"
+      # Optional back-channel hosts (comma-separated host or host:port), e.g. auth:3050. Back-channel endpoints only.
+      AUTH_INTERNAL_HOSTS: "${AUTH_INTERNAL_HOSTS:-}"
+      # Optional: the app itself refuses admin requests from other addresses (e.g. the NetBird range).
+      ADMIN_ALLOWED_CIDRS: "${ADMIN_ALLOWED_CIDRS:-}"
+      # Optional: the proxies allowed to set X-Forwarded-For (default: private ranges, i.e. Traefik).
+      TRUSTED_PROXIES: "${TRUSTED_PROXIES:-}"
+      # --- Database (production): the platform's Postgres, hostname "postgres" on the tourpaq-platform network,
+      # from `bin/create-app tourpaq_auth`. Empty: SQLite on the volume. ---
+      DATABASE_URL: "${DATABASE_URL:-}"
+      DB_POOL: "${DB_POOL:-15}"
+      # --- Microsoft Entra ID (SPECS.md §3): from IT, only in Coolify's environment ---
+      ENTRA_TENANT_ID: "${ENTRA_TENANT_ID:-}"
+      ENTRA_CLIENT_ID: "${ENTRA_CLIENT_ID:-}"
+      ENTRA_CLIENT_SECRET: "${ENTRA_CLIENT_SECRET:-}"
+      ENTRA_CLIENT_SECRET_EXPIRES_ON: "${ENTRA_CLIENT_SECRET_EXPIRES_ON:-}"
+      # The redirect_uri sent to Entra (SPECS.md §24.2). While the registration only has home.app's callback:
+      # https://home.app.journeybooking.eu/auth/entra_id/callback (the Traefik rule below forwards our answers).
+      # Empty: APP_URL's own.
+      ENTRA_REDIRECT_URI: "${ENTRA_REDIRECT_URI:-}"
+      # --- OIDC provider signing keys (SPECS.md §7.3, §14): RSA PEM ---
+      OIDC_SIGNING_KEY: "${OIDC_SIGNING_KEY:-}"
+      OIDC_PREVIOUS_SIGNING_KEY: "${OIDC_PREVIOUS_SIGNING_KEY:-}"
+      # --- Sessions (SPECS.md §3.3, §11.2) ---
+      SESSION_IDLE_HOURS: "${SESSION_IDLE_HOURS:-8}"
+      SESSION_MAX_DAYS: "${SESSION_MAX_DAYS:-7}"
+      ADMIN_SESSION_IDLE_HOURS: "${ADMIN_SESSION_IDLE_HOURS:-2}"
+      ADMIN_REAUTH_HOURS: "${ADMIN_REAUTH_HOURS:-12}"
+      # --- Optional ---
+      TEAMS_WEBHOOK_URL: "${TEAMS_WEBHOOK_URL:-}"
+      IRM_HEARTBEAT_URL: "${IRM_HEARTBEAT_URL:-}"
+      GIT_SHA: "${SOURCE_COMMIT:-}"
+      # --- Runtime (fixed for any container deploy) ---
+      RAILS_ENV: production
+      PORT: "3050"
+      SOLID_QUEUE_IN_PUMA: "true"
+      RAILS_SERVE_STATIC_FILES: "true"
+      RAILS_LOG_TO_STDOUT: "true"
+      # TLS is terminated by the reverse proxy (Traefik on Coolify), which forwards plain HTTP.
+      # ASSUME_SSL keeps cookies secure and URLs https behind it.
+      ASSUME_SSL: "${ASSUME_SSL:-true}"
+      # Secure cookies and HSTS. Set false only to try the image over plain http locally.
+      FORCE_SSL: "${FORCE_SSL:-true}"
+    labels:
+      # --- THE TEMPORARY ENTRA HOP, done by the proxy (SPECS.md §24.2) ---
+      # Entra's registration only has https://home.app.journeybooking.eu/auth/entra_id/callback, which the (old)
+      # Dashboard also uses for its own sign-in. Our state always starts with "tpa." (TourpaqEntraId::STATE_PREFIX),
+      # so this router takes exactly OUR answers on home.app and redirects them, query kept, to our own callback;
+      # every other request on home.app (the old Dashboard's sign-ins included) never matches and goes to the
+      # Dashboard as before. It works before and after the Dashboard's cutover and does not need the Dashboard
+      # to be up. QueryRegexp needs Traefik v3 (`docker exec coolify-proxy traefik version`). noop@internal: a
+      # redirect-only router needs no backend. Remove these labels once IT has added the auth.app redirect URI
+      # and ENTRA_REDIRECT_URI is unset. `$$` is a literal `$` in Compose.
+      - "traefik.enable=true"
+      - "traefik.http.routers.tourpaq-auth-entra-hop.rule=Host(`home.app.journeybooking.eu`) && Path(`/auth/entra_id/callback`) && QueryRegexp(`state`, `^tpa\\.`)"
+      - "traefik.http.routers.tourpaq-auth-entra-hop.priority=100000"
+      - "traefik.http.routers.tourpaq-auth-entra-hop.entrypoints=https"
+      - "traefik.http.routers.tourpaq-auth-entra-hop.tls=true"
+      - "traefik.http.routers.tourpaq-auth-entra-hop.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.tourpaq-auth-entra-hop.service=noop@internal"
+      - "traefik.http.routers.tourpaq-auth-entra-hop.middlewares=tourpaq-auth-entra-hop-redirect"
+      - "traefik.http.middlewares.tourpaq-auth-entra-hop-redirect.redirectregex.regex=^https?://home\\.app\\.journeybooking\\.eu/auth/entra_id/callback\\?(.*)$$"
+      - "traefik.http.middlewares.tourpaq-auth-entra-hop-redirect.redirectregex.replacement=https://auth.app.journeybooking.eu/auth/entra_id/callback?$${1}"
+      - "traefik.http.middlewares.tourpaq-auth-entra-hop-redirect.redirectregex.permanent=false"
+    healthcheck:
+      # Liveness without a database query (SPECS.md §15); /up/ready checks the database.
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:3050/up"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    volumes:
+      # Only used for the SQLite fallback (no DATABASE_URL). With the platform's Postgres it stays empty.
+      - auth_storage:/rails/storage
+    networks: [default, platform]
+
+volumes:
+  auth_storage:
+
+networks:
+  # The shared database network created by the Tourpaq App Platform stack (../Tourpaq-App-Platform),
+  # where its Postgres answers as "postgres". Deploy the platform first: an app that joins an
+  # external network that does not exist fails to start. Locally: docker network create tourpaq-platform
+  platform:
+    external: true
+    name: tourpaq-platform

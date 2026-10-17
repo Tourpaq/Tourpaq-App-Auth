@@ -1,0 +1,26 @@
+<% content_for :title, noun.pluralize %>
+<%= render "admin/index_content/tabs" %>
+<div class="section-head">
+  <h1><%= noun.pluralize %></h1>
+  <%= link_to "Add #{noun.downcase}", url_for(action: :new), class: "button" %>
+</div>
+<p class="muted">
+  <% if model == Index::AccessLevel %>How an entry is reached on the network.<% else %>How you sign in to an entry.<% end %>
+  Shown as a pill on every entry; the tone colours its dot.
+</p>
+<div class="table-wrap">
+  <table>
+    <thead><tr><th class="num">Order</th><th>Label</th><th>Key</th><th>Looks like</th><th class="num">Used by</th></tr></thead>
+    <tbody>
+      <% @records.each do |record| %>
+        <tr>
+          <td class="num muted"><%= record.position %></td>
+          <td><%= link_to record.label, url_for(action: :edit, id: record) %></td>
+          <td><code><%= record.key %></code></td>
+          <td><span class="ix-access ix-tone-<%= record.tone %>"><%= record.label %></span></td>
+          <td class="num"><%= @counts.fetch(record.id, 0) %></td>
+        </tr>
+      <% end %>
+    </tbody>
+  </table>
+</div>

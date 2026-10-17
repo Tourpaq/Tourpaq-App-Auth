@@ -1,0 +1,23 @@
+<% content_for :title, "Fake identity provider" %>
+<h1>Fake identity provider</h1>
+<p class="muted">Development only. Stands in for Microsoft Entra ID (SPECS.md §3.4): it signs in as the address
+  you pick, with the same claims Entra would send.</p>
+
+<% if @users.any? %>
+  <h3>Existing users</h3>
+  <div class="dev-users">
+    <% @users.each do |user| %>
+      <%= button_to dev_sign_in_path, params: { email: user.email, name: user.name }, class: "btn-secondary btn-block", form: { data: { turbo: false } } do %>
+        <%= user.display_name %> <span class="muted small"><%= user.email %><%= " · admin" if user.admin? %><%= " · disabled" if user.disabled? %></span>
+      <% end %>
+    <% end %>
+  </div>
+<% end %>
+
+<h3>Someone else</h3>
+<%= form_tag dev_sign_in_path, method: :post, data: { turbo: false } do %>
+  <div class="field"><%= label_tag :email, "Email" %><%= email_field_tag :email, nil, required: true %></div>
+  <div class="field"><%= label_tag :name, "Name" %><%= text_field_tag :name %></div>
+  <div class="field"><%= label_tag :tid, "Tenant (blank: ours)" %><%= text_field_tag :tid %></div>
+  <button type="submit" class="btn-block">Sign in</button>
+<% end %>

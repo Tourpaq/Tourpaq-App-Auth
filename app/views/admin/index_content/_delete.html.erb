@@ -1,0 +1,7 @@
+<%# Deleting is permanent, so it always asks first. %>
+<div class="card danger-zone">
+  <h2>Delete <%= label %></h2>
+  <% if local_assigns[:note] %><p class="muted"><%= note %></p><% end %>
+  <%= button_to "Delete #{label}", url, method: :delete, class: "danger",
+        form: { data: { turbo_confirm: "Delete #{label}? This cannot be undone." } } %>
+</div>

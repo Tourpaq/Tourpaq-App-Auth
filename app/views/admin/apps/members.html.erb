@@ -1,0 +1,39 @@
+<% content_for :title, "#{@app.name} members" %>
+<p class="breadcrumb"><%= link_to "Apps", admin_apps_path %> / <%= link_to @app.name, admin_app_path(@app) %></p>
+<h1><%= @app.name %> members</h1>
+<p class="muted">Everyone with access to <%= @app.name %>, with their effective <%= @app.multiple_roles? ? "roles, permissions" : "role" %> and where
+  <%= @app.multiple_roles? ? "they come" : "it comes" %> from. This is what the ID token and the access API report.</p>
+<% if @members.any? %>
+  <div class="table-wrap">
+    <table>
+      <% if @app.multiple_roles? %>
+        <thead><tr><th>Name</th><th>Email</th><th>Roles</th><th>Permissions</th></tr></thead>
+        <tbody>
+          <% @members.each do |access| %>
+            <tr>
+              <td><%= link_to access.user.display_name, admin_user_path(access.user) %></td>
+              <td><%= access.user.email %></td>
+              <td><%= effective_role_label(access) %></td>
+              <td><%= permissions_details(access) %></td>
+            </tr>
+          <% end %>
+        </tbody>
+      <% else %>
+        <thead><tr><th>Name</th><th>Email</th><th>Role</th><th>From</th></tr></thead>
+        <tbody>
+          <% @members.each do |access| %>
+            <tr>
+              <td><%= link_to access.user.display_name, admin_user_path(access.user) %></td>
+              <td><%= access.user.email %></td>
+              <td><%= role_badge(access) %></td>
+              <td><%= access.direct? ? "direct" : link_to("group #{access.source}", admin_group_path(access.group)) %></td>
+            </tr>
+          <% end %>
+        </tbody>
+      <% end %>
+    </table>
+  </div>
+  <p class="muted small"><%= pluralize(@members.size, "member") %>.</p>
+<% else %>
+  <p class="empty"><%= @app.disabled? ? "#{@app.name} is disabled: nobody has access." : "Nobody has access yet." %></p>
+<% end %>

@@ -1,0 +1,19 @@
+<% content_for :title, "Token created" %>
+<h1>Token “<%= @token.name %>”</h1>
+<div class="card">
+  <p class="once-warning">This token is shown <strong>only now</strong>. It acts as you in <%= @token.app.name %><% if @token.read_write? %>, including changes<% elsif @token.highest_scope? %>, with the widest scope (<%= @token.scope %>)<% end %>. Store it in a secret store or your MCP client's configuration.</p>
+  <div class="link-box" data-controller="copy" data-copy-text-value="<%= @plain %>">
+    <code><%= @plain %></code>
+    <button type="button" data-copy-target="button">Copy</button>
+  </div>
+  <p class="muted">
+    App: <%= @token.app.name %> ·
+    scope: <%= token_scope_label(@token.scope) %> (capped by your <%= @token.app.multiple_roles? ? "permissions" : "role" %>) ·
+    expires <%= local_time(@token.expires_at, format: :date) %>
+  </p>
+  <% if @token.app.url.present? %>
+    <h3>Use it</h3>
+    <pre>curl -H "Authorization: Bearer <%= @token.token_hint %>…" <%= @token.app.url %>/api/v1/…</pre>
+  <% end %>
+  <p><%= link_to "Back to your tokens", index_tokens_path, class: "button" %></p>
+</div>

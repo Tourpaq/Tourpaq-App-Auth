@@ -1,0 +1,488 @@
+#!/usr/bin/env bash
+# A local test stack: this auth app plus the IRM, KPI, Logs Analyzer, Azure Cost and the Dashboard, all signing in
+# through it, on separate stack databases (docs/local-testing.md is the walkthrough).
+#
+#   bin/dev-stack                     prepare (the default): the auth app's stack database (migrated and seeded), a
+#                                     client secret per app, .env.auth-local in every app, the apps' stack databases;
+#                                     then prints the start commands and the URLs
+#   bin/dev-stack up [app …]          prepare, then start the auth app and the apps (all, or the ones named) in
+#                                     background containers, import the Dashboard's sample access data once, push the
+#                                     Dashboard's permission catalogue, and wait until everything answers
+#   bin/dev-stack down                stop the containers bin/dev-stack started (stack-auth, stack-irm, …)
+#   bin/dev-stack status              which stack containers run, with their URLs
+#   bin/dev-stack logs <name>         follow one container's log (auth, irm, kpi, logs, azure-cost, dashboard)
+#   bin/dev-stack dashboard-import    (again) put sample pre-cutover access data into the Dashboard's stack database,
+#                                     export it with the Dashboard's own export, import it here (dry run, APPLY=1)
+#                                     and run the Dashboard's auth:verify_import (needs the auth app running)
+#   bin/dev-stack reset               down, then delete every stack database and the generated .env.auth-local files
+#                                     (bin/dev-stack recreates them)
+#
+# Nobody's .env and no development database is touched: every container gets ENV_FILE=.env.auth-local (the apps'
+# bin/docker-dev pass that file instead of .env), and every database is a stack one: storage/stack.sqlite3 (the
+# Logs Analyzer also storage/stack_queue.sqlite3 and storage/stack_data/), KPI's tourpaq_kpi_*_development_stack
+# databases in its own TimescaleDB dev container (DB_SUFFIX=_stack). SQLite only otherwise; no Postgres container
+# is started (Postgres is CI's job).
+#
+# Hosts: auth http://auth.localhost:3050 (the issuer), index http://index.localhost:3050, admin
+# http://admin.localhost:3050; the fake identity provider at http://auth.localhost:3050/dev/sign_in. The apps reach
+# the auth app's back-channel at http://host.docker.internal:3050 (AUTH_INTERNAL_HOSTS / LOGIN_INTERNAL_URL).
+#
+# Settings (environment):
+#   IRM_PORT=3030 KPI_PORT=3040 LOGS_PORT=3020 AZURE_COST_PORT=3010 DASHBOARD_PORT=4013
+#                                     host ports; a port other than the default is added to the client's redirect URIs
+#                                     in the stack database (audited client.updated)
+#   STACK_ACCESS_CACHE_SECONDS=30     the apps' LOGIN_ACCESS_CACHE_SECONDS: how soon a removed grant ends a session
+#   STACK_APPS="irm kpi …"            the apps to prepare (default: all five)
+#   CODE_DIR=..                       where the app repositories are (default: next to this one)
+set -euo pipefail
+
+AUTH_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+CODE_DIR="${CODE_DIR:-$(dirname "$AUTH_DIR")}"
+ENV_NAME=".env.auth-local"
+STATE_DIR="$AUTH_DIR/tmp/dev-stack"
+ISSUER="http://auth.localhost:3050"
+INTERNAL_URL="http://host.docker.internal:3050"
+ALL_APPS="irm kpi logs azure-cost dashboard"
+APPS="${STACK_APPS:-$ALL_APPS}"
+CACHE_SECONDS="${STACK_ACCESS_CACHE_SECONDS:-30}"
+
+# --- The apps ------------------------------------------------------------------------------------------------------
+
+app_dir() {
+  case "$1" in
+    irm) echo "$CODE_DIR/Tourpaq-App-IRM" ;;
+    kpi) echo "$CODE_DIR/Tourpaq-App-KPI" ;;
+    logs) echo "$CODE_DIR/Tourpaq-App-Logs-Analyzer" ;;
+    azure-cost) echo "$CODE_DIR/Tourpaq-App-Azure-Cost" ;;
+    dashboard) echo "$CODE_DIR/Tourpaq-App-Dashboard" ;;
+    *) echo "unknown app $1 (one of: $ALL_APPS)" >&2; exit 64 ;;
+  esac
+}
+
+app_client() { echo "$1-web"; }
+
+# The port inside the container (each app's dev port, which its bin/docker-dev publishes).
+app_inner_port() {
+  case "$1" in irm) echo 3030 ;; kpi) echo 3040 ;; logs) echo 3020 ;; azure-cost) echo 3010 ;; dashboard) echo 4013 ;; esac
+}
+
+# The port on this machine (WEB_PORT of bin/docker-dev).
+app_port() {
+  case "$1" in
+    irm) echo "${IRM_PORT:-3030}" ;;
+    kpi) echo "${KPI_PORT:-3040}" ;;
+    logs) echo "${LOGS_PORT:-3020}" ;;
+    azure-cost) echo "${AZURE_COST_PORT:-3010}" ;;
+    dashboard) echo "${DASHBOARD_PORT:-4013}" ;;
+  esac
+}
+
+app_title() {
+  case "$1" in irm) echo "IRM" ;; kpi) echo "KPI" ;; logs) echo "Logs Analyzer" ;; azure-cost) echo "Azure Cost" ;; dashboard) echo "Dashboard" ;; esac
+}
+
+container() { echo "stack-$1"; }
+
+server_cmd() { # $1 = inner port
+  echo "bin/rails server -b 0.0.0.0 -p $1 -P tmp/pids/stack-server.pid"
+}
+
+say() { printf '%s\n' "$*"; }
+step() { printf '\n== %s\n' "$*"; }
+die() { printf 'dev-stack: %s\n' "$*" >&2; exit 1; }
+
+check_docker() {
+  docker info >/dev/null 2>&1 || die "Docker is not running."
+}
+
+check_apps() {
+  local name
+  for name in $APPS; do
+    [ -x "$(app_dir "$name")/bin/docker-dev" ] || die "$(app_dir "$name")/bin/docker-dev not found (set CODE_DIR, or leave the app out with STACK_APPS)."
+    grep -q 'ENV_FILE' "$(app_dir "$name")/bin/docker-dev" && grep -q 'DOCKER_NAME' "$(app_dir "$name")/bin/docker-dev" ||
+      die "$(app_dir "$name")/bin/docker-dev does not know ENV_FILE and DOCKER_NAME yet (docs/local-testing.md, \"Prerequisites\")."
+  done
+}
+
+# Runs bin/docker-dev in a repository with the stack's env file.
+in_repo() { # $1 = directory, rest = command
+  local dir="$1"; shift
+  (cd "$dir" && ENV_FILE="$ENV_NAME" bin/docker-dev "$@" </dev/null)
+}
+
+# The value of NAME in an env file, or nothing.
+env_value() { # $1 = file, $2 = NAME
+  [ -f "$1" ] || return 0
+  sed -n "s/^$2=//p" "$1" | tail -1
+}
+
+# --- The env files -------------------------------------------------------------------------------------------------
+
+write_auth_env() {
+  cat >"$AUTH_DIR/$ENV_NAME" <<EOF
+# Written by bin/dev-stack (the local test stack, docs/local-testing.md). Not committed (.gitignore: /.env*).
+# Used with: ENV_FILE=$ENV_NAME bin/docker-dev …   Regenerated on every bin/dev-stack run: edit bin/dev-stack instead.
+APP_URL=$ISSUER
+INDEX_URL=http://index.localhost:3050
+ADMIN_URL=http://admin.localhost:3050
+# The apps' containers call the back-channel here (their LOGIN_INTERNAL_URL).
+AUTH_INTERNAL_HOSTS=host.docker.internal:3050
+# The stack's own SQLite database: storage/development.sqlite3 is never touched.
+DATABASE_URL=sqlite3:storage/stack.sqlite3
+# Database tasks act on the stack database only, never on the test database too.
+SKIP_TEST_DATABASE=true
+EOF
+}
+
+write_app_env() { # $1 = app, $2 = secret
+  local name="$1" secret="$2" dir port file
+  dir="$(app_dir "$name")"; port="$(app_port "$name")"; file="$dir/$ENV_NAME"
+  {
+    say "# Written by bin/dev-stack in Tourpaq-App-Auth (the local test stack, its docs/local-testing.md)."
+    say "# Not committed (.gitignore: /.env*). Holds a client secret of the LOCAL auth app only (its stack database)."
+    say "# Used with: ENV_FILE=$ENV_NAME bin/docker-dev …   Regenerated by bin/dev-stack: edit bin/dev-stack instead."
+    say "LOGIN_ISSUER=$ISSUER"
+    say "# auth.localhost inside a container is the container itself: the back-channel goes to the host's port 3050."
+    say "LOGIN_INTERNAL_URL=$INTERNAL_URL"
+    say "LOGIN_CLIENT_ID=$(app_client "$name")"
+    say "LOGIN_CLIENT_SECRET=$secret"
+    say "# Short, so a removed grant ends the session within a minute (the default is 300)."
+    say "LOGIN_ACCESS_CACHE_SECONDS=$CACHE_SECONDS"
+    say "PORT=$(app_inner_port "$name")"
+    say "SKIP_TEST_DATABASE=true"
+    case "$name" in
+      irm)
+        say "APP_URL=http://localhost:$port"
+        say "DATABASE_URL=sqlite3:storage/stack.sqlite3" ;;
+      kpi)
+        say "APP_URL=http://localhost:$port"
+        say "# KPI runs on its own TimescaleDB dev container: the stack uses its own databases there."
+        say "DB_SUFFIX=_stack" ;;
+      logs)
+        say "DATABASE_URL=sqlite3:storage/stack.sqlite3"
+        say "QUEUE_DATABASE_URL=sqlite3:storage/stack_queue.sqlite3"
+        say "DATA_DIR=/rails/storage/stack_data" ;;
+      azure-cost)
+        say "DATABASE_URL=sqlite3:storage/stack.sqlite3" ;;
+      dashboard)
+        say "DATABASE_URL=sqlite3:storage/stack.sqlite3"
+        say "# The temporary Entra hop (the auth app's SPECS.md §24.2) forwards to the local auth app."
+        say "AUTH_ENTRA_CALLBACK_URL=$ISSUER/auth/entra_id/callback"
+        say "AUTH_ADMIN_URL=http://admin.localhost:3050"
+        say "AUTH_INDEX_URL=http://index.localhost:3050" ;;
+    esac
+  } >"$file.new"
+  mv "$file.new" "$file"
+  chmod 600 "$file"
+}
+
+# --- Prepare -------------------------------------------------------------------------------------------------------
+
+# The auth app's side, in one Rails process: refuses anything but a stack database, adds redirect URIs for
+# non-default ports (audited client.updated), keeps a secret the app's env file already holds (compared by its
+# SHA-256, never sent here in plain), otherwise creates one with auth:client_secret (deleting the oldest when the
+# client already holds two, audited client.secret_deleted). Prints "SECRET <client> <value>" for new secrets (read by
+# this script, never shown), "KEEP <client>", "DASHBOARD_ROLES <n>".
+SETUP_RUBY='
+db = ActiveRecord::Base.connection_db_config.database.to_s
+abort "dev-stack: refusing to run on #{db}: only a stack database (storage/stack.sqlite3)" unless File.basename(db) == "stack.sqlite3"
+Current.channel = "console"
+require "rake"
+Rails.application.load_tasks
+ARGV.each do |spec|
+  client_id, port, default_port, digest = spec.split(",", 4)
+  client = Client.find_by(client_id: client_id) or abort("dev-stack: no client #{client_id} in the stack database")
+  if port != default_port
+    uris = client.redirect_uris | [ "http://localhost:#{port}/sso/callback" ]
+    post = client.post_logout_redirect_uris | [ "http://localhost:#{port}/" ]
+    if uris != client.redirect_uris || post != client.post_logout_redirect_uris
+      client.update!(redirect_uris: uris, post_logout_redirect_uris: post)
+      changes = client.saved_changes.except("updated_at").transform_values(&:last)
+      AuditEvent.record("client.updated", subject: client, actor: nil, data: { changes: changes, by: "dev-stack script" })
+    end
+  end
+  if digest.present? && client.active_secrets.exists?(secret_digest: digest)
+    puts "KEEP #{client_id}"
+    next
+  end
+  while client.active_secrets.count >= Client::MAX_ACTIVE_SECRETS
+    old = client.active_secrets.first
+    old.destroy!
+    AuditEvent.record("client.secret_deleted", subject: client, actor: nil,
+                      data: { hint: old.hint, expires_at: old.expires_at&.utc&.iso8601, by: "dev-stack script" }.compact)
+  end
+  out = StringIO.new
+  real, $stdout = $stdout, out
+  begin
+    Rake::Task["auth:client_secret"].reenable
+    Rake::Task["auth:client_secret"].invoke(client_id)
+  ensure
+    $stdout = real
+  end
+  secret = out.string[/^LOGIN_CLIENT_SECRET=(\S+)$/, 1] or abort("dev-stack: auth:client_secret printed no secret for #{client_id}")
+  puts "SECRET #{client_id} #{secret}"
+end
+dashboard = App.find_by(slug: "dashboard")
+puts "DASHBOARD_ROLES #{dashboard ? dashboard.roles.count : 0}"
+'
+
+DASHBOARD_ROLES=0
+
+prepare() {
+  check_docker
+  check_apps
+  mkdir -p "$STATE_DIR"
+
+  step "Auth app: env file and stack database (storage/stack.sqlite3)"
+  write_auth_env
+  in_repo "$AUTH_DIR" bin/rails db:prepare >"$STATE_DIR/auth-db-prepare.log" 2>&1 ||
+    { cat "$STATE_DIR/auth-db-prepare.log" >&2; die "db:prepare failed in the auth app"; }
+  say "migrated and seeded"
+
+  step "Client secrets (auth:client_secret) and redirect URIs"
+  local specs="" name file secret digest
+  for name in $APPS; do
+    file="$(app_dir "$name")/$ENV_NAME"
+    secret="$(env_value "$file" LOGIN_CLIENT_SECRET)"
+    digest=""
+    [ -n "$secret" ] && digest="$(printf '%s' "$secret" | shasum -a 256 | cut -d' ' -f1)"
+    specs="$specs $(app_client "$name"),$(app_port "$name"),$(app_inner_port "$name"),$digest"
+  done
+  local output
+  # shellcheck disable=SC2086
+  output="$(in_repo "$AUTH_DIR" bin/rails runner "$SETUP_RUBY" $specs 2>"$STATE_DIR/auth-setup.err")" ||
+    { cat "$STATE_DIR/auth-setup.err" >&2; die "the auth app's setup failed"; }
+
+  local client
+  for name in $APPS; do
+    client="$(app_client "$name")"
+    file="$(app_dir "$name")/$ENV_NAME"
+    secret="$(printf '%s\n' "$output" | awk -v c="$client" '$1 == "SECRET" && $2 == c { print $3 }')"
+    if [ -n "$secret" ]; then
+      say "$client: new secret (written to $(basename "$(app_dir "$name")")/$ENV_NAME)"
+    elif printf '%s\n' "$output" | grep -qx "KEEP $client"; then
+      secret="$(env_value "$file" LOGIN_CLIENT_SECRET)"
+      say "$client: the secret in $ENV_NAME is still valid"
+    else
+      die "no secret for $client"
+    fi
+    write_app_env "$name" "$secret"
+  done
+  DASHBOARD_ROLES="$(printf '%s\n' "$output" | awk '$1 == "DASHBOARD_ROLES" { print $2 }')"
+  DASHBOARD_ROLES="${DASHBOARD_ROLES:-0}"
+
+  for name in $APPS; do
+    step "$(app_title "$name"): stack database"
+    in_repo "$(app_dir "$name")" bin/rails db:prepare >"$STATE_DIR/$name-db-prepare.log" 2>&1 ||
+      { tail -40 "$STATE_DIR/$name-db-prepare.log" >&2; die "db:prepare failed in $(app_dir "$name")"; }
+    say "ready (log: tmp/dev-stack/$name-db-prepare.log)"
+  done
+}
+
+# --- Start and stop ------------------------------------------------------------------------------------------------
+
+running() { [ -n "$(docker ps -q -f name="^$1\$")" ]; }
+
+port_busy() { # $1 = port: something other than the stack's container listens there
+  lsof -nP -iTCP:"$1" -sTCP:LISTEN >/dev/null 2>&1
+}
+
+start_one() { # $1 = name (auth or an app)
+  local name="$1" dir port inner
+  if [ "$name" = auth ]; then dir="$AUTH_DIR"; port=3050; inner=3050; else dir="$(app_dir "$name")"; port="$(app_port "$name")"; inner="$(app_inner_port "$name")"; fi
+  if running "$(container "$name")"; then
+    say "$(container "$name") is already running"
+    return 0
+  fi
+  if port_busy "$port"; then
+    die "port $port is in use (another server, e.g. your own dev server or a container: docker ps). Stop it, or for an app pick another port, e.g. $(printf '%s' "$name" | tr 'a-z-' 'A-Z_')_PORT=$((port + 1)) bin/dev-stack up"
+  fi
+  rm -f "$dir/tmp/pids/stack-server.pid"
+  # shellcheck disable=SC2046
+  (cd "$dir" && ENV_FILE="$ENV_NAME" WEB_PORT="$port" DOCKER_NAME="$(container "$name")" \
+    exec nohup bin/docker-dev $(server_cmd "$inner")) </dev/null >"$STATE_DIR/$name.log" 2>&1 &
+  name_container "$name"
+  say "starting $(container "$name") on port $port (log: tmp/dev-stack/$name.log)"
+}
+
+# Every bin/docker-dev names its container after DOCKER_NAME, so down/status/logs find it; wait until it exists.
+name_container() { # $1 = name
+  local i
+  for i in $(seq 1 60); do
+    running "$(container "$1")" && return 0
+    sleep 1
+  done
+  die "no container appeared for $1 (log: tmp/dev-stack/$1.log)"
+}
+
+wait_for() { # $1 = name, $2 = url
+  local i
+  for i in $(seq 1 120); do
+    curl -fsS -o /dev/null --max-time 3 "$2" 2>/dev/null && { say "$1 answers at $2"; return 0; }
+    sleep 2
+  done
+  tail -30 "$STATE_DIR/$1.log" >&2 || true
+  die "$1 did not answer at $2 within 4 minutes"
+}
+
+up() {
+  local only="${*:-}"
+  [ -n "$only" ] && APPS="$only"
+  prepare
+  step "Starting"
+  start_one auth
+  wait_for auth "http://127.0.0.1:3050/up"
+  local name
+  case " $APPS " in
+    *" dashboard "*)
+      if [ "$DASHBOARD_ROLES" = "0" ]; then dashboard_import; fi
+      step "Dashboard: pushing its permission catalogue"
+      in_repo "$(app_dir dashboard)" bin/rails auth:push_catalogue 2>&1 | grep -E 'Pushed|^Role |not pushed|not configured' || true ;;
+  esac
+  for name in $APPS; do start_one "$name"; done
+  for name in $APPS; do wait_for "$name" "http://localhost:$(app_port "$name")/up"; done
+  print_urls
+}
+
+down() {
+  check_docker
+  local name stopped=0
+  for name in auth $ALL_APPS; do
+    if running "$(container "$name")"; then
+      docker stop "$(container "$name")" >/dev/null && say "stopped $(container "$name")"
+      stopped=1
+    fi
+  done
+  [ "$stopped" = 1 ] || say "no stack container is running"
+}
+
+status() {
+  check_docker
+  local name port
+  for name in auth $ALL_APPS; do
+    if running "$(container "$name")"; then
+      port="$(docker port "$(container "$name")" 2>/dev/null | sed -n 's/.*0\.0\.0\.0:\([0-9]*\).*/\1/p' | head -1)"
+      say "running  $(container "$name")  port $port"
+    else
+      say "stopped  $(container "$name")"
+    fi
+  done
+}
+
+reset() {
+  down
+  step "Deleting the stack databases and env files"
+  rm -f "$AUTH_DIR"/storage/stack.sqlite3* "$AUTH_DIR/$ENV_NAME"
+  local name dir
+  for name in $ALL_APPS; do
+    dir="$(app_dir "$name")"
+    [ -d "$dir" ] || continue
+    if [ "$name" = kpi ] && [ -f "$dir/$ENV_NAME" ]; then
+      # Drops tourpaq_kpi_development_stack and tourpaq_kpi_ts_development_stack only (DB_SUFFIX, SKIP_TEST_DATABASE).
+      in_repo "$dir" env DISABLE_DATABASE_ENVIRONMENT_CHECK=1 bin/rails db:drop >/dev/null 2>&1 || say "KPI: db:drop failed (is Docker up?)"
+    fi
+    rm -f "$dir"/storage/stack.sqlite3* "$dir"/storage/stack_queue.sqlite3* "$dir/$ENV_NAME" "$dir/tmp/stack-dashboard-export.json"
+    rm -rf "$dir/storage/stack_data"
+  done
+  rm -rf "$STATE_DIR"
+  say "done: bin/dev-stack recreates everything"
+}
+
+# --- The Dashboard's access data (SPECS.md §23.5, rehearsed on the stack) -----------------------------------------
+
+# Sample pre-cutover data in the Dashboard's stack database, through anonymous models (the tables the export reads):
+# the four groups the Dashboard's seeds created before the move, five people (their Entra ids as the fake identity
+# provider derives them, tenant + object id as the Dashboard stored them), memberships and one live MCP token. Only
+# into an empty groups table, and only into a stack database.
+DASHBOARD_SAMPLE_RUBY='
+db = ActiveRecord::Base.connection_db_config.database.to_s
+abort "dev-stack: refusing to run on #{db}" unless File.basename(db) == "stack.sqlite3"
+row = ->(table) { Class.new(ActiveRecord::Base) { self.table_name = table; self.inheritance_column = nil } }
+groups, users, memberships, tokens = row.("groups"), row.("users"), row.("memberships"), row.("api_tokens")
+if groups.exists?
+  puts "The Dashboard stack database already has groups: left as it is."
+  exit
+end
+tenant = "00000000-0000-4000-8000-00000000fa4e"
+oid = lambda do |email|
+  hex = Digest::SHA256.hexdigest("fake-entra-oid:#{email}")
+  "#{hex[0, 8]}-#{hex[8, 4]}-4#{hex[13, 3]}-8#{hex[17, 3]}-#{hex[20, 12]}"
+end
+g = {}
+[ [ "Administrators", "Full access to everything, including users and groups.", [ "*" ], true ],
+  [ "Support", "Sees customers, issues and own tasks.", %w[module:dashboard:view module:tasks:view module:customers:view], false ],
+  [ "Support Manager", "As Support, plus customer release notes.", %w[module:dashboard:view module:tasks:view module:customers:view module:release_notes:manage], false ],
+  [ "Management", "Management overview. Financial figures granted separately.", %w[module:dashboard:view module:customers:view module:management:view], false ]
+].each { |name, description, permissions, system| g[name] = groups.create!(name: name, description: description, permissions: permissions, system: system) }
+people = [
+  [ "mwi@tourpaq.com", "Mogens", true, true, [ "Administrators" ] ],
+  [ "support.agent@tourpaq.com", "Stack Support Agent", true, true, [ "Support" ] ],
+  [ "manager@tourpaq.com", "Stack Manager", true, true, [ "Management", "Support Manager" ] ],
+  [ "former@tourpaq.com", "Stack Former Employee", false, true, [ "Support" ] ],
+  [ "youtrack.only@tourpaq.com", "Stack YouTrack Import", true, false, [ "Support" ] ]
+]
+people.each do |email, name, active, bound, member_of|
+  user = users.create!(email: email, name: name, active: active, entra_oid: bound ? "#{tenant}#{oid.(email)}" : nil)
+  member_of.each { |group| memberships.create!(user_id: user.id, group_id: g.fetch(group).id) }
+end
+owner = users.find_by!(email: "support.agent@tourpaq.com")
+plain = "tpq_mcp_stack_#{SecureRandom.hex(8)}"
+tokens.create!(user_id: owner.id, name: "Paperclip (stack sample)", capability: "all", expires_at: 90.days.from_now,
+               token_digest: Digest::SHA256.hexdigest(plain), token_prefix: plain[0, 18], created_by: "dev-stack script")
+puts "Sample access data: #{groups.count} groups, #{users.count} people, #{memberships.count} memberships, 1 token."
+'
+
+dashboard_import() {
+  local dir; dir="$(app_dir dashboard)"
+  step "Dashboard: sample pre-cutover access data, its export, the import here (SPECS.md §23.5)"
+  in_repo "$dir" bin/rails runner "$DASHBOARD_SAMPLE_RUBY" 2>/dev/null
+  in_repo "$dir" env OUT=tmp/stack-dashboard-export.json bin/rails auth:export 2>&1 | grep -E '^(Wrote|Note)' || true
+  [ -s "$dir/tmp/stack-dashboard-export.json" ] || die "the Dashboard's export wrote nothing"
+  mkdir -p "$STATE_DIR"
+  cp "$dir/tmp/stack-dashboard-export.json" "$STATE_DIR/dashboard-export.json"
+  say "-- dry run:"
+  in_repo "$AUTH_DIR" bin/rails "auth:import_dashboard[tmp/dev-stack/dashboard-export.json]" 2>&1 | grep -v -i 'deprecation\|previous behavior\|called from' | tail -15 || true
+  say "-- APPLY=1:"
+  (cd "$AUTH_DIR" && APPLY=1 ENV_FILE="$ENV_NAME" bin/docker-dev bin/rails "auth:import_dashboard[tmp/dev-stack/dashboard-export.json]" </dev/null) 2>&1 | grep -v -i 'deprecation\|previous behavior\|called from' | tail -15 || true
+  if curl -fsS -o /dev/null --max-time 3 http://127.0.0.1:3050/up 2>/dev/null; then
+    say "-- the Dashboard's check (auth:verify_import):"
+    in_repo "$dir" bin/rails "auth:verify_import[tmp/stack-dashboard-export.json]" 2>/dev/null | tail -15 || say "(differences: see above)"
+  fi
+}
+
+# --- Output --------------------------------------------------------------------------------------------------------
+
+print_urls() {
+  local name
+  step "The stack"
+  say "Auth (issuer)   http://auth.localhost:3050      sign in: http://auth.localhost:3050/dev/sign_in (mwi@tourpaq.com is an admin)"
+  say "Index           http://index.localhost:3050     tokens: http://index.localhost:3050/tokens"
+  say "Admin           http://admin.localhost:3050"
+  for name in $APPS; do
+    printf '%-15s http://localhost:%s\n' "$(app_title "$name")" "$(app_port "$name")"
+  done
+  say ""
+  say "Stop everything: bin/dev-stack down    Walkthrough: docs/local-testing.md"
+}
+
+print_commands() {
+  local name
+  step "Start (each in its own terminal), or all at once in the background: bin/dev-stack up"
+  say "cd $AUTH_DIR && ENV_FILE=$ENV_NAME bin/docker-dev"
+  for name in $APPS; do
+    say "cd $(app_dir "$name") && ENV_FILE=$ENV_NAME WEB_PORT=$(app_port "$name") bin/docker-dev $(server_cmd "$(app_inner_port "$name")")"
+  done
+  print_urls
+}
+
+case "${1:-prepare}" in
+  prepare) prepare; print_commands ;;
+  up) shift; up "$@" ;;
+  down) down ;;
+  status) status ;;
+  logs) [ -n "${2:-}" ] || die "usage: bin/dev-stack logs <auth|irm|kpi|logs|azure-cost|dashboard>"; docker logs -f "$(container "$2")" ;;
+  dashboard-import) check_docker; dashboard_import ;;
+  reset) reset ;;
+  -h|--help|help) sed -n '2,/^set -euo/p' "$0" | sed '$d' | sed 's/^# \{0,1\}//' ;;
+  *) die "unknown command $1 (bin/dev-stack help)" ;;
+esac

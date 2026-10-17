@@ -1,0 +1,72 @@
+<% content_for :title, "Index content" %>
+<%= render "admin/index_content/tabs" %>
+<h1>Index content</h1>
+<p class="muted">What index.app shows (SPECS.md §24.3). Changes are live as soon as you save. An entry tied to an app is shown
+  only to users with access to it; sections and other entries are shown to everyone signed in or to the chosen groups.</p>
+
+<div class="cards">
+  <% @counts.each do |label, (count, path)| %>
+    <%= link_to path, class: "metric metric-link" do %><div class="metric-value"><%= count %></div><div class="metric-label"><%= label %></div><% end %>
+  <% end %>
+</div>
+
+<div class="actions">
+  <%= link_to "Add an entry", new_admin_index_entry_path, class: "button" %>
+  <%= link_to "Write a doc", new_admin_index_doc_path, class: "btn-secondary" %>
+  <%= link_to "Add a section", new_admin_index_section_path, class: "btn-secondary" %>
+</div>
+
+<h2>Missing information <span class="muted small"><%= pluralize(@gaps.size, "entry", plural: "entries") %> with no section, access level or login method</span></h2>
+<% if @gaps.empty? %>
+  <p class="empty">Nothing missing. Every entry has a section, an access level and a login method.</p>
+<% else %>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Name</th><th>Section</th><th>Access</th><th>Login</th></tr></thead>
+      <tbody>
+        <% @gaps.each do |entry| %>
+          <tr>
+            <td><%= link_to entry.name, edit_admin_index_entry_path(entry) %></td>
+            <td><%= entry.section&.name || tag.span("missing", class: "ix-access ix-tone-unset") %></td>
+            <td><%= index_marker_pill(entry.access_level, unset: "missing", prefix: "Network access") %></td>
+            <td><%= index_marker_pill(entry.login_method, unset: "missing", prefix: "Login") %></td>
+          </tr>
+        <% end %>
+      </tbody>
+    </table>
+  </div>
+<% end %>
+
+<% if @unseen_sections.any? || @unseen_entries.any? %>
+  <h2>Seen by nobody <span class="muted small">restricted to groups, but no group chosen</span></h2>
+  <ul class="plain-list">
+    <% @unseen_sections.each do |section| %><li>Section <%= link_to section.name, edit_admin_index_section_path(section) %></li><% end %>
+    <% @unseen_entries.each do |entry| %><li>Entry <%= link_to entry.name, edit_admin_index_entry_path(entry) %></li><% end %>
+  </ul>
+<% end %>
+
+<% if @apps_without_entry.any? %>
+  <h2>Apps without an entry <span class="muted small">shown under “Your apps” to the users with access, with no pills</span></h2>
+  <ul class="plain-list">
+    <% @apps_without_entry.each do |app| %>
+      <li><%= link_to app.name, admin_app_path(app) %> · <%= link_to "Add its entry", new_admin_index_entry_path(app_id: app.id) %></li>
+    <% end %>
+  </ul>
+<% end %>
+
+<h2>Recently changed</h2>
+<% if @recent.empty? %>
+  <p class="empty">Nothing yet.</p>
+<% else %>
+  <ul class="plain-list">
+    <% @recent.each do |record| %>
+      <li>
+        <% if record.is_a?(Index::Entry) %>
+          <%= link_to record.name, edit_admin_index_entry_path(record) %> <span class="muted small">entry · <%= index_time_ago(record.updated_at) %></span>
+        <% else %>
+          <%= link_to record.title, edit_admin_index_doc_path(record) %> <span class="muted small">doc · <%= index_time_ago(record.updated_at) %></span>
+        <% end %>
+      </li>
+    <% end %>
+  </ul>
+<% end %>

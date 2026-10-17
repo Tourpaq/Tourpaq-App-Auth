@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+# Zip the index's browser extension (clients/index-extension) for the Chrome Web Store or Edge Add-ons:
+#   bin/package-index-extension        → tmp/tourpaq-index-extension-<version>.zip
+# Bump "version" in clients/index-extension/manifest.json first; the stores refuse a version they have seen. The tests
+# (tools/) are left out. Needs no Ruby, so it runs on the host.
+set -euo pipefail
+cd "$(dirname "$0")/.."
+
+version=$(sed -n 's/^ *"version": *"\([^"]*\)".*/\1/p' clients/index-extension/manifest.json)
+out="tmp/tourpaq-index-extension-${version}.zip"
+mkdir -p tmp
+rm -f "$out"
+(cd clients/index-extension && zip -qr "../../$out" . -x '.*' '*/.*' 'tools/*' 'README.md')
+echo "$out"

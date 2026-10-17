@@ -1,0 +1,42 @@
+<%= form_with model: [ :admin, section ], class: "card ix-admin-form" do |f| %>
+  <%= render "admin/shared/errors", record: section %>
+  <div class="ix-form-grid">
+    <div class="field">
+      <%= f.label :name %>
+      <%= f.text_field :name, required: true %>
+    </div>
+    <div class="field">
+      <%= f.label :layout %>
+      <%= f.select :layout, [ [ "Cards on the front page", "cards" ], [ "Own page, compact table", "table" ] ] %>
+    </div>
+    <div class="field full">
+      <%= f.label :description %>
+      <%= f.text_field :description, placeholder: "Shown under the section's heading and on its tile" %>
+    </div>
+    <div class="field">
+      <%= f.label :visibility, "Shown to" %>
+      <%= f.select :visibility, [ [ "Everyone signed in", "everyone" ], [ "Only these groups", "groups" ] ] %>
+    </div>
+    <div class="field">
+      <span class="hint">Groups (with “Only these groups”)</span>
+      <div class="ix-group-choices">
+        <%= f.collection_check_boxes :group_ids, Group.ordered, :id, :name do |b| %>
+          <label class="check"><%= b.check_box %> <%= b.text %></label>
+        <% end %>
+      </div>
+    </div>
+    <div class="field">
+      <%= f.label :position, "Order" %>
+      <%= f.number_field :position %>
+      <p class="hint">Lower comes first in the menu.</p>
+    </div>
+    <div class="field">
+      <%= f.label :slug, "URL slug" %>
+      <%= f.text_field :slug, placeholder: "made from the name" %>
+    </div>
+  </div>
+  <div class="actions">
+    <%= f.submit section.persisted? ? "Save" : "Add" %>
+    <%= link_to "Cancel", admin_index_sections_path, class: "btn-secondary" %>
+  </div>
+<% end %>

@@ -1,0 +1,46 @@
+<% content_for :title, @entry.name %>
+<div class="ix">
+  <p class="ix-crumb">
+    <%= link_to "Home", index_root_path %> <span class="ix-crumb-sep">/</span>
+    <%= @entry.section ? link_to(@entry.section.name, index_section_path(@entry.section)) : "Not in a group" %>
+  </p>
+
+  <div class="ix-page-head">
+    <%= index_icon(@entry, size: "lg") %>
+    <div class="ix-page-head-text">
+      <h1><%= @entry.name %> <%= index_status_badge(@entry) %></h1>
+      <p class="muted ix-lede"><%= @entry.description %></p>
+    </div>
+    <div class="ix-page-head-actions">
+      <% if @entry.url %><%= link_to "Open ↗", safe_index_href(@entry.url), class: "ix-btn" %><% end %>
+      <% if current_user.admin? %><%= link_to "Edit", admin_host_url("/index/entries/#{@entry.to_param}/edit"), class: "ix-btn-secondary" %><% end %>
+    </div>
+  </div>
+
+  <div class="ix-facts">
+    <% if @entry.url %><div class="ix-fact"><span class="ix-fact-label">URL</span><%= link_to @entry.url, safe_index_href(@entry.url) %></div><% end %>
+    <% if @entry.address %><div class="ix-fact"><span class="ix-fact-label">Address</span><code class="ix-copy" data-controller="index-copy"
+      data-index-copy-text-value="<%= @entry.address %>" data-action="click->index-copy#copy" title="Click to copy"><%= @entry.address %></code></div><% end %>
+    <div class="ix-fact"><span class="ix-fact-label">Access</span><%= index_marker_pill(@entry.access_level, unset: "not recorded", prefix: "Network access") %></div>
+    <div class="ix-fact"><span class="ix-fact-label">Login</span><%= index_marker_pill(@entry.login_method, unset: "not recorded", prefix: "Login") %></div>
+    <% if (access = index_viewer.access_for(@entry.app)) %><div class="ix-fact"><span class="ix-fact-label">Your role</span><%= effective_role_label(access) %></div><% end %>
+    <% if @entry.owner %><div class="ix-fact"><span class="ix-fact-label">Owner</span><%= @entry.owner %></div><% end %>
+    <% if @entry.repo %><div class="ix-fact"><span class="ix-fact-label">Repo</span><%= link_to @entry.repo, safe_index_href(@entry.repo) %></div><% end %>
+  </div>
+
+  <% if @entry.links.any? %>
+    <h2>Links</h2>
+    <ul class="ix-link-list ix-link-list-lg">
+      <% @entry.links.each do |link| %>
+        <li>
+          <%= link_to link.label, safe_index_href(link.url) %>
+          <% if link.note.present? %><span class="ix-link-note"><%= link.note %></span><% end %>
+        </li>
+      <% end %>
+    </ul>
+  <% end %>
+
+  <div class="ix-prose"><%= @body.html %></div>
+
+  <p class="ix-page-footer muted">Last changed <%= index_time_ago(@entry.updated_at) %>.</p>
+</div>

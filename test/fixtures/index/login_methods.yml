@@ -1,0 +1,4 @@
+sso:
+  key: sso
+  label: SSO login
+  tone: ok

@@ -1,0 +1,65 @@
+<% content_for :title, "#{@role.key} in #{@app.name}" %>
+<p class="breadcrumb"><%= link_to "Apps", admin_apps_path %> / <%= link_to @app.name, admin_app_path(@app) %></p>
+<h1>Role <%= @role.key %></h1>
+<p class="muted">Held through <%= pluralize(@grant_count, "grant") %>.
+  <% if @app.multiple_roles? %>Users get the union of the permissions of every role they hold.<% end %></p>
+
+<%= form_with url: admin_app_role_path(@app, @role), method: :patch, class: "card" do |f| %>
+  <div class="field full">
+    <%= label_tag "role_description", "Description" %>
+    <%= text_field_tag "role[description]", @role.description, id: "role_description", class: "wide-input" %>
+  </div>
+
+  <% if @app.multiple_roles? %>
+    <h2>Permissions</h2>
+    <%= hidden_field_tag "role[permissions][]", "", id: nil %>
+    <label class="check">
+      <%= check_box_tag "role[permissions][]", AppRole::WILDCARD, @role.wildcard?, id: "permission_wildcard" %>
+      <strong>Everything (*)</strong> <span class="muted small">every permission <%= @app.name %> has, now and later</span>
+    </label>
+
+    <% if @unknown.any? %>
+      <p class="unknown-permission" role="alert">Not in <%= @app.name %>'s catalogue: <%= @unknown.join(", ") %>. Still sent to the app,
+        which ignores keys it does not check. Untick to remove.</p>
+    <% end %>
+
+    <div class="catalogue-groups">
+      <% @catalogue_groups.each do |group, entries| %>
+        <fieldset>
+          <legend><%= group %></legend>
+          <% entries.each do |entry| %>
+            <label class="check">
+              <%= check_box_tag "role[permissions][]", entry.key, @role.permissions.include?(entry.key), id: "permission_#{entry.id}" %>
+              <span><%= entry.display_label %><code><%= entry.key %></code></span>
+            </label>
+          <% end %>
+        </fieldset>
+      <% end %>
+      <% if @other.any? %>
+        <fieldset class="<%= 'unknown' if @app.catalogue_pushed? %>">
+          <legend><%= @app.catalogue_pushed? ? "Unknown to the catalogue" : "Keys (no catalogue pushed yet)" %></legend>
+          <% @other.each_with_index do |key, index| %>
+            <label class="check <%= 'unknown-permission' if @app.catalogue_pushed? %>">
+              <%= check_box_tag "role[permissions][]", key, true, id: "permission_other_#{index}" %>
+              <code><%= key %></code>
+            </label>
+          <% end %>
+        </fieldset>
+      <% end %>
+    </div>
+    <% unless @app.catalogue_pushed? %>
+      <p class="muted small"><%= @app.name %> has not pushed its permission catalogue yet, so there is nothing to tick: type keys below.</p>
+    <% end %>
+
+    <div class="field full">
+      <%= label_tag "role_extra_permissions", "Other keys (one per line)" %>
+      <%= text_area_tag "role[extra_permissions]", nil, rows: 3, id: "role_extra_permissions", class: "mono", placeholder: "module:customers:view" %>
+      <p class="hint">Keys the catalogue does not list are kept and flagged in red.</p>
+    </div>
+  <% end %>
+
+  <div class="actions">
+    <%= f.submit "Save role" %>
+    <%= link_to "Cancel", admin_app_path(@app), class: "btn-secondary" %>
+  </div>
+<% end %>
