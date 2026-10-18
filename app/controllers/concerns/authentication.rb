@@ -81,8 +81,7 @@ module Authentication
 
   # For flows that need credentials given to Entra recently.
   def require_recent_sign_in(max_age)
-    entra_auth_time = Current.session&.entra_auth_time
-    return true if entra_auth_time && entra_auth_time >= max_age.ago
+    return true if Current.session&.credentials_given_since?(max_age.ago)
     request_sign_in(return_to: request.fullpath, prompt: "login")
     false
   end
@@ -111,11 +110,13 @@ module Authentication
   end
 
   # When a fresh sign-in was asked for, Entra must say it asked for credentials since then: the browser
-  # can drop prompt=login on its way to Microsoft, but not change the signed auth_time.
+  # can drop prompt=login on its way to Microsoft, but not change the signed auth_time. Entra sends auth_time
+  # only as an optional claim; without it the completed round trip (now) counts, unless ENTRA_REQUIRE_AUTH_TIME.
   def fresh_enough?(entra_auth_time)
     asked_at = session[FRESH_SIGN_IN_KEY]
     return true if asked_at.blank?
-    entra_auth_time.present? && entra_auth_time.to_i >= asked_at.to_i - Session::FRESH_SIGN_IN_LEEWAY.to_i
+    return !Rails.configuration.x.auth.entra_require_auth_time if entra_auth_time.blank?
+    entra_auth_time.to_i >= asked_at.to_i - Session::FRESH_SIGN_IN_LEEWAY.to_i
   end
 
   def refuse_stale_entra_sign_in(auth)

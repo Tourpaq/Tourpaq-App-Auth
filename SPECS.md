@@ -101,8 +101,14 @@ for), never in the sign-in form: the Entra strategy sends `prompt=login` from th
 from the browser. Because whoever holds the browser can still drop `prompt=login` on its way to Microsoft, the
 callback takes the time credentials were given from Entra's signed **`auth_time` claim** and refuses the sign-in
 (`auth.login_refused`, reason `not_fresh`, "Microsoft did not ask for it") when it is older than the request (5
-minutes' clock leeway) or missing. Entra sends `auth_time` only as an optional claim, so the registration must have
-it (§1, go-live §19); without it every fresh sign-in, and so every admin sign-in after 12 hours, is refused.
+minutes' clock leeway). Entra sends `auth_time` only as an optional claim of the registration, which the IT request
+did not include: the first live admin.app sign-in (18 Oct 2026) was refused as `not_fresh` every time. **Default since
+then (`ENTRA_REQUIRE_AUTH_TIME=false`)**: without `auth_time`, freshness counts from the last Entra sign-in the auth
+app completed (`Session#credentials_given_at` = `entra_authenticated_at`), and a callback for a requested fresh sign-in
+without `auth_time` counts as given now. The cost: a fresh sign-in is then requested (`prompt=login`) but not proven,
+because whoever holds the browser could drop `prompt=login` and Microsoft would sign in silently. With the optional
+claim added by IT and `ENTRA_REQUIRE_AUTH_TIME=true`, the strict rule above applies again. When Entra does send
+`auth_time`, it is always used, whatever the setting.
 
 ### 3.2 Who the user is
 

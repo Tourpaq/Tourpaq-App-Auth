@@ -26,13 +26,47 @@ class FreshSignInTest < ActionDispatch::IntegrationTest
     assert client_redirect_params["code"].present?
   end
 
-  test "a fresh sign-in is refused when Entra does not say when credentials were given (no auth_time)" do
+  test "ENTRA_REQUIRE_AUTH_TIME: a fresh sign-in is refused when Entra does not say when credentials were given" do
+    with_auth_config(entra_require_auth_time: true) do
+      sign_in_as users(:alice)
+      get authorize_path_for(@client, max_age: 0)
+      assert_redirected_to "/sign_in"
+      sign_in_with_entra(email: users(:alice).email, auth_time: nil)
+      assert_response :forbidden
+      assert_equal "not_fresh", AuditEvent.last.data["reason"]
+    end
+  end
+
+  # Entra sends auth_time only as an optional claim of the registration (seen live, 18 Oct 2026: every admin.app
+  # sign-in was refused as not_fresh). By default the completed Entra round trip then counts.
+  test "without auth_time from Entra: a fresh sign-in counts from the completed Entra round trip" do
     sign_in_as users(:alice)
     get authorize_path_for(@client, max_age: 0)
     assert_redirected_to "/sign_in"
     sign_in_with_entra(email: users(:alice).email, auth_time: nil)
-    assert_response :forbidden
-    assert_equal "not_fresh", AuditEvent.last.data["reason"]
+    follow_redirect!
+    assert client_redirect_params["code"].present?
+  end
+
+  test "without auth_time from Entra: the admin host opens on a recent Entra sign-in without asking again" do
+    sign_in_with_entra(email: users(:mwi).email, auth_time: nil)
+    on_admin_host!
+    get "/users"
+    get response.location # /oauth/authorize with max_age=12 hours on the auth host
+    assert_match %r{\Ahttp://admin\.example\.com/sso/callback\?}, response.location, "no new Entra sign-in needed"
+    get response.location
+    follow_redirect! while response.redirect?
+    assert_response :success
+    assert Session.admin.exists?(user: users(:mwi))
+  end
+
+  test "without auth_time from Entra: an Entra sign-in older than max_age still needs a new one" do
+    sign_in_with_entra(email: users(:mwi).email, auth_time: nil)
+    Session.home.last.update!(entra_authenticated_at: 13.hours.ago) # the session itself stays alive (not idle)
+    get authorize_path_for(@client, max_age: 12 * 3600)
+    assert_redirected_to "/sign_in"
+    get authorize_path_for(@client, max_age: 14 * 3600)
+    assert client_redirect_params["code"].present?, "within max_age it goes straight through"
   end
 
   test "a silent Entra sign-in keeps Entra's auth_time, so signing out and in again does not satisfy max_age" do

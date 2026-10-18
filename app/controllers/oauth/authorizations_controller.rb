@@ -78,8 +78,8 @@ class Oauth::AuthorizationsController < ApplicationController
 
   def max_age = params[:max_age].present? ? params[:max_age].to_i : nil
 
-  # Decided on when the person last gave Entra their credentials (Entra's auth_time), not on when the
-  # session started: a silent Entra sign-in is no fresh sign-in. Unknown (no auth_time) is too old.
+  # Decided on when the person last gave Entra their credentials (Session#credentials_given_since?): Entra's
+  # auth_time when it sends one, else the Entra sign-in behind the session (unless ENTRA_REQUIRE_AUTH_TIME).
   def reauthentication_needed?(prompts)
     if prompts.include?("login") || max_age == 0
       !reauthenticated_since_marker?

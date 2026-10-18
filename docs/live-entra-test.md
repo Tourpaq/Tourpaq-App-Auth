@@ -159,6 +159,11 @@ set `LOGIN_ISSUER=https://auth.app.journeybooking.eu`, `LOGIN_CLIENT_ID`, `LOGIN
 
   Before 17 Oct, a second start in the same browser overwrote the first (the auto-submitted page plus a click, or
   two tabs). The auth app now keeps the last three attempts, each usable once.
+- **"This sign-in needs you to enter your Microsoft password again, and Microsoft did not ask for it"** (opening
+  admin.app, or an app asking for `prompt=login` / `max_age`): the auth app required Entra's `auth_time` claim, which
+  Entra only sends as an optional claim. Since 18 Oct, freshness instead counts from the last Entra sign-in the auth
+  app completed, so a recent sign-in opens admin.app directly. For the strict proof, ask IT to add the optional
+  claim `auth_time` to the ID token (Token configuration), then set `ENTRA_REQUIRE_AUTH_TIME=true`.
 - **`invalid_client` / `AADSTS7000215`**: the client secret is wrong. Use the secret's *Value*, not its *Secret ID*.
 - **`AADSTS50011` (redirect URI mismatch)**: `ENTRA_REDIRECT_URI` is not exactly
   `https://home.app.journeybooking.eu/auth/entra_id/callback`.

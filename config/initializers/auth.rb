@@ -50,6 +50,11 @@ Rails.application.config.x.auth = ActiveSupport::OrderedOptions.new.tap do |auth
   # the auth host's own callback. While the registration only has home.app's callback, set it to
   # https://home.app.journeybooking.eu/auth/entra_id/callback: the Dashboard forwards that GET here.
   auth.entra_redirect_uri = env["ENTRA_REDIRECT_URI"].presence || "#{auth.app_url}/auth/entra_id/callback"
+  # Entra puts auth_time (when the person last gave Microsoft their credentials) in its ID token only when the
+  # registration has it as an optional claim. Without it, freshness (the admin host's 12 hours, an app's
+  # prompt=login / max_age) counts from the last Entra sign-in the auth app completed. true: require auth_time,
+  # so a fresh sign-in is proven, not just requested (set it once IT has added the optional claim). SPECS.md §3.1.
+  auth.entra_require_auth_time = env["ENTRA_REQUIRE_AUTH_TIME"].to_s == "true"
   # A quote or space pasted around a value would otherwise only show at the first sign-in (lib/entra_settings.rb).
   entra_problems = EntraSettings.problems(tenant_id: env["ENTRA_TENANT_ID"], client_id: env["ENTRA_CLIENT_ID"],
                                           client_secret: env["ENTRA_CLIENT_SECRET"])

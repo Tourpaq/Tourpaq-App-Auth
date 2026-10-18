@@ -64,10 +64,16 @@ class Session < ApplicationRecord
     admin? ? Rails.configuration.x.auth.admin_reauth : Rails.configuration.x.auth.session_max
   end
 
-  # Did the person give Entra their credentials at or after `time` (within FRESH_SIGN_IN_LEEWAY)? Never
-  # when Entra did not say when (no auth_time claim).
+  # Did the person give Entra their credentials at or after `time` (within FRESH_SIGN_IN_LEEWAY)? Entra's
+  # auth_time when it sent one; without it, the Entra sign-in behind this session, unless ENTRA_REQUIRE_AUTH_TIME
+  # demands the claim (then never).
   def credentials_given_since?(time)
-    entra_auth_time.present? && entra_auth_time.to_i >= time.to_i - FRESH_SIGN_IN_LEEWAY.to_i
+    at = credentials_given_at
+    at.present? && at.to_i >= time.to_i - FRESH_SIGN_IN_LEEWAY.to_i
+  end
+
+  def credentials_given_at
+    entra_auth_time || (entra_authenticated_at unless Rails.configuration.x.auth.entra_require_auth_time)
   end
 
   # The auth_time an app's ID token carries: Entra's, else the Entra sign-in behind the session.

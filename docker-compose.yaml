@@ -52,6 +52,10 @@ services:
       # https://home.app.journeybooking.eu/auth/entra_id/callback (deploy/traefik/tourpaq-auth-entra-hop.yaml forwards our answers).
       # Empty: APP_URL's own.
       ENTRA_REDIRECT_URI: "${ENTRA_REDIRECT_URI:-}"
+      # true: a fresh sign-in (admin host 12 h, prompt=login, max_age) must be proven by Entra's auth_time claim,
+      # which Entra only sends once IT adds it as an optional claim of the ID token. Default: counts from the
+      # last completed Entra sign-in (SPECS.md §3.1).
+      ENTRA_REQUIRE_AUTH_TIME: "${ENTRA_REQUIRE_AUTH_TIME:-false}"
       # --- OIDC provider signing keys (SPECS.md §7.3, §14): RSA PEM ---
       OIDC_SIGNING_KEY: "${OIDC_SIGNING_KEY:-}"
       OIDC_PREVIOUS_SIGNING_KEY: "${OIDC_PREVIOUS_SIGNING_KEY:-}"
