@@ -49,7 +49,7 @@ services:
       ENTRA_CLIENT_SECRET: "${ENTRA_CLIENT_SECRET:-}"
       ENTRA_CLIENT_SECRET_EXPIRES_ON: "${ENTRA_CLIENT_SECRET_EXPIRES_ON:-}"
       # The redirect_uri sent to Entra (SPECS.md §24.2). While the registration only has home.app's callback:
-      # https://home.app.journeybooking.eu/auth/entra_id/callback (the Traefik rule below forwards our answers).
+      # https://home.app.journeybooking.eu/auth/entra_id/callback (deploy/traefik/tourpaq-auth-entra-hop.yaml forwards our answers).
       # Empty: APP_URL's own.
       ENTRA_REDIRECT_URI: "${ENTRA_REDIRECT_URI:-}"
       # --- OIDC provider signing keys (SPECS.md §7.3, §14): RSA PEM ---
@@ -75,27 +75,9 @@ services:
       ASSUME_SSL: "${ASSUME_SSL:-true}"
       # Secure cookies and HSTS. Set false only to try the image over plain http locally.
       FORCE_SSL: "${FORCE_SSL:-true}"
-    labels:
-      # --- THE TEMPORARY ENTRA HOP, done by the proxy (SPECS.md §24.2) ---
-      # Entra's registration only has https://home.app.journeybooking.eu/auth/entra_id/callback, which the (old)
-      # Dashboard also uses for its own sign-in. Our state always starts with "tpa." (TourpaqEntraId::STATE_PREFIX),
-      # so this router takes exactly OUR answers on home.app and redirects them, query kept, to our own callback;
-      # every other request on home.app (the old Dashboard's sign-ins included) never matches and goes to the
-      # Dashboard as before. It works before and after the Dashboard's cutover and does not need the Dashboard
-      # to be up. QueryRegexp needs Traefik v3 (`docker exec coolify-proxy traefik version`). noop@internal: a
-      # redirect-only router needs no backend. Remove these labels once IT has added the auth.app redirect URI
-      # and ENTRA_REDIRECT_URI is unset. `$$` is a literal `$` in Compose.
-      - "traefik.enable=true"
-      - "traefik.http.routers.tourpaq-auth-entra-hop.rule=Host(`home.app.journeybooking.eu`) && Path(`/auth/entra_id/callback`) && QueryRegexp(`state`, `^tpa\\.`)"
-      - "traefik.http.routers.tourpaq-auth-entra-hop.priority=100000"
-      - "traefik.http.routers.tourpaq-auth-entra-hop.entrypoints=https"
-      - "traefik.http.routers.tourpaq-auth-entra-hop.tls=true"
-      - "traefik.http.routers.tourpaq-auth-entra-hop.tls.certresolver=letsencrypt"
-      - "traefik.http.routers.tourpaq-auth-entra-hop.service=noop@internal"
-      - "traefik.http.routers.tourpaq-auth-entra-hop.middlewares=tourpaq-auth-entra-hop-redirect"
-      - "traefik.http.middlewares.tourpaq-auth-entra-hop-redirect.redirectregex.regex=^https?://home\\.app\\.journeybooking\\.eu/auth/entra_id/callback\\?(.*)$$"
-      - "traefik.http.middlewares.tourpaq-auth-entra-hop-redirect.redirectregex.replacement=https://auth.app.journeybooking.eu/auth/entra_id/callback?$${1}"
-      - "traefik.http.middlewares.tourpaq-auth-entra-hop-redirect.redirectregex.permanent=false"
+    # THE TEMPORARY ENTRA HOP (SPECS.md §24.2) is NOT configured here: it is a Traefik dynamic configuration file,
+    # deploy/traefik/tourpaq-auth-entra-hop.yaml, installed in Coolify's proxy. Traefik labels with `$` do not
+    # survive Coolify (the Compose escape `$$` reached Traefik unchanged and the redirect lost Entra's query).
     healthcheck:
       # Liveness without a database query (SPECS.md §15); /up/ready checks the database.
       test: ["CMD", "curl", "-fsS", "http://127.0.0.1:3050/up"]

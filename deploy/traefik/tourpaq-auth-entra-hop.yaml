@@ -1,0 +1,33 @@
+# THE TEMPORARY ENTRA HOP (SPECS.md §24.2), as a Traefik dynamic configuration file.
+#
+# Install on the Coolify server: Servers → <server> → Proxy → Dynamic Configurations → add a file named
+# tourpaq-auth-entra-hop.yaml with this content (or copy it to /data/coolify/proxy/dynamic/). Traefik picks it up
+# within seconds; no deploy needed.
+#
+# Why a file and not labels in docker-compose.yaml: the replacement needs `${1}`, and Coolify passed the Compose-
+# escaped `$${1}` to Traefik unchanged, which Traefik reads as the literal text "${1}" (the callback arrived as
+# /auth/entra_id/callback?${1} and every sign-in failed as csrf_detected). This file is not touched by Compose.
+#
+# Entra's registration only has https://home.app.journeybooking.eu/auth/entra_id/callback, which the old Dashboard
+# also uses for its own sign-in. The auth app's state always starts with "tpa." (TourpaqEntraId::STATE_PREFIX), so
+# this router takes exactly the auth app's answers on home.app and redirects them, query kept, to auth.app; the
+# Dashboard's own sign-ins never match. Delete the file once IT has added the auth.app redirect URI and
+# ENTRA_REDIRECT_URI is unset. Single-quoted YAML: backslashes are literal.
+http:
+  routers:
+    tourpaq-auth-entra-hop:
+      rule: 'Host(`home.app.journeybooking.eu`) && Path(`/auth/entra_id/callback`) && QueryRegexp(`state`, `^tpa\.`)'
+      priority: 200000
+      entryPoints:
+        - https
+      service: noop@internal
+      middlewares:
+        - tourpaq-auth-entra-hop-redirect
+      tls:
+        certResolver: letsencrypt
+  middlewares:
+    tourpaq-auth-entra-hop-redirect:
+      redirectRegex:
+        regex: '^https?://home\.app\.journeybooking\.eu/auth/entra_id/callback\?(.*)$'
+        replacement: 'https://auth.app.journeybooking.eu/auth/entra_id/callback?${1}'
+        permanent: false

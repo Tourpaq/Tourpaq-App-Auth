@@ -159,6 +159,17 @@ class EntraRedirectHopTest < ActionDispatch::IntegrationTest
     end
   end
 
+  test "a forward that lost Entra's query is named as such (seen live: the callback arrived as ?${1})" do
+    with_auth_config(entra_redirect_uri: HOP) do
+      start_sign_in
+      get AuthHosts.auth_url + "/auth/entra_id/callback?${1}"
+    end
+    assert_response :forbidden
+    event = AuditEvent.last
+    assert_equal [ "csrf_detected", "no_state_in_request" ], [ event.data["reason"], event.data["state_check"] ]
+    assert_empty FakeEntra.exchanges
+  end
+
   test "a state with the right prefix but the wrong random part is refused" do
     with_auth_config(entra_redirect_uri: HOP) do
       start_sign_in

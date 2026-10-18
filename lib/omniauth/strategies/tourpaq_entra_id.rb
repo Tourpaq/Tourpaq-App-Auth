@@ -89,6 +89,9 @@ module OmniAuth
         end
         session[PENDING_KEY] = pending
         return "matched" if match
+        # Entra's answer lost its query on the way, e.g. a forward that did not fill in the query (seen with a Traefik
+        # label whose `$` Coolify did not unescape: the callback arrived as "?${1}").
+        return "no_state_in_request" if state.empty?
         return "no_session_cookie" unless request.cookies.key?(Rails.application.config.session_options[:key].to_s)
         pending.any? ? "unknown_state" : "no_attempt_in_session"
       end

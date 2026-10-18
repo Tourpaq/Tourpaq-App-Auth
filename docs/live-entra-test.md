@@ -7,12 +7,13 @@ only knows `https://home.app.journeybooking.eu/auth/entra_id/callback`, which th
 ```
 browser ─▶ auth.app /auth/entra_id ─▶ Microsoft (redirect_uri = home.app/auth/entra_id/callback, state = tpa.…)
         ◀─ 302 home.app/auth/entra_id/callback?code=…&state=tpa.…
-home.app: Traefik rule (labels on the auth container) sees state=tpa.… ─▶ 302 auth.app/auth/entra_id/callback?<same query>
+home.app: Traefik rule (deploy/traefik/tourpaq-auth-entra-hop.yaml) sees state=tpa.… ─▶ 302 auth.app/auth/entra_id/callback?<same query>
 auth.app verifies state, nonce, PKCE, the ID token and tid ─▶ signed in ─▶ index.app
 ```
 
 The old Dashboard's own sign-ins carry a state without `tpa.` and never match the rule: **the Dashboard is not
-touched and does not need a deploy.** Stopping the auth app removes the rule.
+touched and does not need a deploy.** The rule is a Traefik dynamic configuration file in Coolify's proxy (step 3b),
+not labels on the container. Deleting the file removes it.
 
 ## 0. Check the proxy is Traefik v3
 
@@ -92,6 +93,17 @@ https://auth.app.journeybooking.eu:3050,https://index.app.journeybooking.eu:3050
 
 `APP_URL`, `INDEX_URL` and `ADMIN_URL` default to the three production hosts, so leave them unset.
 
+## 3b. The hop in Coolify's proxy
+
+In Coolify, go to **Servers → (the server) → Proxy → Dynamic Configurations** and add a file named
+`tourpaq-auth-entra-hop.yaml` with the content of [`deploy/traefik/tourpaq-auth-entra-hop.yaml`](../deploy/traefik/tourpaq-auth-entra-hop.yaml).
+You can also copy that file to `/data/coolify/proxy/dynamic/` on the server. Traefik reloads it within seconds;
+nothing needs a redeploy.
+
+It is a file and not labels in `docker-compose.yaml` because Coolify does not unescape `$$` in labels. The redirect's
+`${1}` reached Traefik as `$${1}`, the browser landed on `/auth/entra_id/callback?${1}` without Entra's `code` and
+`state`, and every sign-in failed as `csrf_detected`. Use the file content exactly as it is, with `${1}` and no doubled `$`.
+
 ## 4. NetBird
 
 Give the three hosts the access you want: auth.app and index.app for everyone who uses the apps, and admin.app for the
@@ -112,9 +124,10 @@ curl -sI "https://home.app.journeybooking.eu/auth/entra_id/callback?code=x&state
 curl -sI "https://home.app.journeybooking.eu/auth/entra_id/callback?code=x&state=abc" | grep -i -e '^HTTP' -e '^location'
 ```
 
-If the first check does not redirect, look at Traefik's dashboard/logs for the router `tourpaq-auth-entra-hop`. In
-Coolify, the entry point is `https` and the resolver `letsencrypt`; if your proxy names them differently, adjust the
-two labels.
+If the first check does not redirect, or the `location` ends in `?${1}` instead of the query, look at Traefik's logs
+(`docker logs coolify-proxy`) for the router `tourpaq-auth-entra-hop` and check the dynamic configuration file
+(step 3b). In Coolify the entry point is `https` and the resolver `letsencrypt`. If your proxy names them differently,
+adjust those two lines in the file.
 
 ## 6. The live test
 
@@ -151,13 +164,16 @@ set `LOGIN_ISSUER=https://auth.app.journeybooking.eu`, `LOGIN_CLIENT_ID`, `LOGIN
   `https://home.app.journeybooking.eu/auth/entra_id/callback`.
 - **Back on home.app with a Dashboard error instead of auth.app**: the Traefik rule did not match. Repeat the `curl`
   checks in step 5.
+- **`csrf_detected` with `Started GET "/auth/entra_id/callback?${1}"` in the auth app's log** (`state_check`
+  `no_state_in_request`): the redirect lost Entra's query because the `$` was escaped. Use the dynamic configuration
+  file (step 3b), not Compose labels.
 
 ## Rolling back
 
-Stop or delete the auth app resource in Coolify. The Traefik rule goes with the container, and home.app is exactly
-the Dashboard again. Nothing in Entra or the Dashboard was changed.
+Delete the `tourpaq-auth-entra-hop.yaml` dynamic configuration (home.app is then exactly the Dashboard again), and stop
+or delete the auth app resource in Coolify. Nothing in Entra or the Dashboard was changed.
 
 ## Afterwards
 
 When IT has added `https://auth.app.journeybooking.eu/auth/entra_id/callback` to the registration, unset
-`ENTRA_REDIRECT_URI`, delete the `traefik.*` labels in `docker-compose.yaml`, and redeploy.
+`ENTRA_REDIRECT_URI`, redeploy, and delete the `tourpaq-auth-entra-hop.yaml` dynamic configuration.

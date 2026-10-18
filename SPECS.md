@@ -1403,15 +1403,17 @@ The registration has only `https://home.app.journeybooking.eu/auth/entra_id/call
   still runs on home.app and still uses the same callback for its own sign-in:
   - the auth app's Entra `state` always starts with **`tpa.`** (`TourpaqEntraId::STATE_PREFIX`; the random part
     follows, and the whole state is still compared against the session);
-  - a Traefik router in the auth app's `docker-compose.yaml` labels matches `Host(home.app) && Path(/auth/entra_id/callback)
+  - a Traefik router in a dynamic configuration file in Coolify's proxy (`deploy/traefik/tourpaq-auth-entra-hop.yaml`)
+    matches `Host(home.app) && Path(/auth/entra_id/callback)
     && QueryRegexp(state, ^tpa\.)` and answers a 302 to auth.app's callback with the query kept (`redirectregex`,
     `service=noop@internal`). It needs Traefik v3. Everything else on home.app, including the old Dashboard's own
     sign-in, never matches and reaches the Dashboard as before;
-  - the router exists only while the auth container runs. Stopping the auth app removes it and returns home.app to
-    the Dashboard unchanged;
+  - it is a file and not Compose labels: Coolify passed the label's escaped `$${1}` to Traefik unchanged, the redirect
+    lost Entra's query (`/auth/entra_id/callback?${1}`), and the first live sign-in failed as `csrf_detected`
+    (18 Oct 2026). Deleting the file returns home.app to the Dashboard unchanged;
   - after the Dashboard's cutover, the Dashboard's own forward route stays as a second, redundant path.
 - The cost of the proxy forward is small: sign-in depends on Traefik, not on the Dashboard. Removing the hop is one
-  IT change (add the auth.app redirect URI), one env change (`ENTRA_REDIRECT_URI` unset) and deleting the labels.
+  IT change (add the auth.app redirect URI), one env change (`ENTRA_REDIRECT_URI` unset) and deleting the dynamic configuration file.
 - The go-live steps for a first live Entra test are in `docs/live-entra-test.md`.
 
 *Built (auth side):* `ENTRA_REDIRECT_URI` (`Rails.configuration.x.auth.entra_redirect_uri`, default
