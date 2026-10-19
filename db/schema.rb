@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_10_19_080001) do
+ActiveRecord::Schema[8.1].define(version: 2026_10_19_090001) do
   create_table "app_permissions", force: :cascade do |t|
     t.integer "app_id", null: false
     t.string "key", null: false
@@ -151,6 +151,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_19_080001) do
     t.text "description"
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.boolean "staff", default: false, null: false
     t.index ["name"], name: "index_groups_on_name", unique: true
   end
 
@@ -164,12 +165,23 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_19_080001) do
     t.index ["key"], name: "index_index_access_levels_on_key", unique: true
   end
 
+  create_table "index_doc_section_groups", force: :cascade do |t|
+    t.integer "doc_section_id", null: false
+    t.integer "group_id", null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["doc_section_id", "group_id"], name: "index_index_doc_section_groups_on_doc_section_id_and_group_id", unique: true
+    t.index ["doc_section_id"], name: "index_index_doc_section_groups_on_doc_section_id"
+    t.index ["group_id"], name: "index_index_doc_section_groups_on_group_id"
+  end
+
   create_table "index_doc_sections", force: :cascade do |t|
     t.string "key", null: false
     t.string "title", null: false
     t.integer "position", default: 100, null: false
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.string "visibility", default: "everyone", null: false
     t.index ["key"], name: "index_index_doc_sections_on_key", unique: true
   end
 
@@ -526,6 +538,8 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_19_080001) do
   add_foreign_key "grants", "apps"
   add_foreign_key "group_memberships", "groups"
   add_foreign_key "group_memberships", "users"
+  add_foreign_key "index_doc_section_groups", "groups", on_delete: :cascade
+  add_foreign_key "index_doc_section_groups", "index_doc_sections", column: "doc_section_id", on_delete: :cascade
   add_foreign_key "index_docs", "index_doc_sections", column: "doc_section_id", on_delete: :nullify
   add_foreign_key "index_entries", "apps", on_delete: :nullify
   add_foreign_key "index_entries", "index_access_levels", column: "access_level_id", on_delete: :nullify

@@ -34,9 +34,11 @@ class ImportIndexTaskTest < ActiveSupport::TestCase
   end
 
   test "a missing file, no path or another format aborts" do
-    assert_raises(SystemExit) { capture_io { run_task } }
-    assert_raises(SystemExit) { capture_io { run_task("/nope.json") } }
+    # run_task captures the output itself: a second capture_io around it would lock minitest's IO lock twice, which
+    # deadlocks in a parallel run.
+    assert_raises(SystemExit) { run_task }
+    assert_raises(SystemExit) { run_task("/nope.json") }
     other = Rails.root.join("test/fixtures/files/dashboard_export.json").to_s
-    assert_raises(SystemExit) { capture_io { run_task(other) } }
+    assert_raises(SystemExit) { run_task(other) }
   end
 end

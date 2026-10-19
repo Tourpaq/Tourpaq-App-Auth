@@ -14,7 +14,7 @@
       <tbody>
         <% @groups.each do |group| %>
           <tr>
-            <td><%= link_to group.name, admin_group_path(group) %><% if group.description.present? %><div class="muted small"><%= group.description %></div><% end %></td>
+            <td><%= link_to group.name, admin_group_path(group) %><% if group.staff? %> <span class="pill pill-muted">staff</span><% end %><% if group.description.present? %><div class="muted small"><%= group.description %></div><% end %></td>
             <td class="num"><%= group.users.size %></td>
             <td class="wrap">
               <% group.grants.sort_by { _1.app.name }.each do |grant| %>

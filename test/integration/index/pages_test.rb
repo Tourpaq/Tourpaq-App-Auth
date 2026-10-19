@@ -70,6 +70,19 @@ class Index::PagesTest < ActionDispatch::IntegrationTest
     assert_response :not_found
   end
 
+  test "a doc the viewer may not see is a 404, and is in neither the menu nor search" do
+    index_doc_sections(:deployment).update!(visibility: "groups", groups: [ groups(:dk_tech) ])
+    sign_in_index users(:alice), path: "/docs/deployment/deploying-a-new-app"
+    assert_response :not_found
+    get "/"
+    assert_select ".sidebar a[href='/docs/deployment/deploying-a-new-app']", 0
+    assert_select ".ix-tile[href='/docs/deployment/deploying-a-new-app']", 0
+    get "/search?q=deployment"
+    assert_select "a[href='/docs/deployment/deploying-a-new-app']", 0
+    get "/search.json"
+    assert_not_includes response.parsed_body.map { _1["href"] }, "/docs/deployment/deploying-a-new-app"
+  end
+
   test "search: the page and the json index, both limited to what the viewer may see" do
     sign_in_index users(:mwi), path: "/search?q=bravo+sql"
     assert_response :success

@@ -15,19 +15,34 @@ class Admin::GroupsTest < ActionDispatch::IntegrationTest
     assert_select "td a", "Alice Popescu"
   end
 
+  test "the staff box: on the form, a pill in the list, and said on the group's page" do
+    get "/groups/new"
+    assert_select "input[type=checkbox][name='group[staff]']:not([checked])"
+    get "/groups"
+    assert_select "tr", text: /RO Dev.*staff/m
+    get "/groups/#{groups(:ro_dev).id}"
+    assert_select "p", /Tourpaq staff: members see what index.app shows to all staff/
+    groups(:ro_dev).update!(staff: false)
+    get "/groups/#{groups(:ro_dev).id}"
+    assert_select "p", /Not staff: members see only their own apps/
+  end
+
   test "create, rename and delete a group, audited" do
     get "/groups/new"
     assert_response :success
     post "/groups", params: { group: { name: "RO QA", description: "Testers" } }
     group = Group.find_by!(name: "RO QA")
     assert_redirected_to "/groups/#{group.id}"
-    assert_equal({ "name" => "RO QA" }, audit("group.created").data)
+    assert_equal({ "name" => "RO QA", "staff" => false }, audit("group.created").data, "a new group is not staff until ticked")
 
     get "/groups/#{group.id}/edit"
     assert_response :success
     patch "/groups/#{group.id}", params: { group: { name: "RO Quality" } }
     assert_redirected_to "/groups/#{group.id}"
     assert_equal({ "changes" => { "name" => "RO Quality" } }, audit("group.updated").data)
+    patch "/groups/#{group.id}", params: { group: { staff: "1" } }
+    assert_equal({ "changes" => { "staff" => true } }, audit("group.updated").data)
+    assert group.reload.staff?
 
     post "/groups", params: { group: { name: "ro quality" } }
     assert_response :unprocessable_entity, "names are unique, ignoring case"

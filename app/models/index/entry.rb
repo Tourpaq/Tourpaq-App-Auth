@@ -2,8 +2,9 @@
 # the two pills (access level, login method) and an optional markdown details page.
 #
 # An entry may be tied to an auth App (SPECS.md §24.3): it is then shown only to users with access to that app, with
-# their role(s), and its own visibility is not used. Every other entry has a visibility: "everyone" signed in, or the
-# chosen auth groups. An entry in a section is shown only when the section is visible too.
+# their role(s), and its own visibility is not used. Every other entry has a visibility: "everyone" (all Tourpaq
+# staff, Index::Viewer#staff?), or the chosen auth groups. An entry in a section is shown only when the section is
+# visible too.
 #
 #   Index::Entry.visible_to(viewer)   # in the query, on every surface
 #   Index::Entry.search("sql bravo")  # every term in the name, description, URL, address, owner, section or a link
@@ -47,13 +48,13 @@ class Index::Entry < ApplicationRecord
     where(id: visible_ids(viewer))
   end
 
-  # The ids of the entries the viewer may see, as a subquery: by its own rule (the app's access, or everyone, or
-  # the viewer's groups), and in no section or a visible one.
+  # The ids of the entries the viewer may see, as a subquery: by its own rule (the app's access, the viewer's groups,
+  # or everyone for staff), and in no section or a visible one.
   def self.visible_ids(viewer)
     base = unscoped
-    own = base.where(app_id: nil, visibility: "everyone")
-              .or(base.where(app_id: nil, visibility: "groups", id: Index::EntryGroup.where(group_id: viewer.group_ids).select(:entry_id)))
+    own = base.where(app_id: nil, visibility: "groups", id: Index::EntryGroup.where(group_id: viewer.group_ids).select(:entry_id))
               .or(base.where(app_id: viewer.app_ids))
+    own = own.or(base.where(app_id: nil, visibility: "everyone")) if viewer.staff?
     own.where(section_id: nil).or(own.where(section_id: Index::Section.visible_ids(viewer))).select(:id)
   end
 
@@ -84,10 +85,10 @@ class Index::Entry < ApplicationRecord
     name.split(/[\s\-_]+/).reject(&:blank?).first(2).map { |w| w[0] }.join.upcase.presence || "?"
   end
 
-  # "Users with access to IRM", "Everyone signed in", "DK Tech, RO DevOps".
+  # "Users with access to IRM", "All Tourpaq staff", "DK Tech, RO DevOps".
   def visibility_label
     return "Users with access to #{app.name}" if app
-    return "Everyone signed in" unless restricted?
+    return Index::STAFF_LABEL unless restricted?
     names = groups.map(&:name).sort
     names.any? ? names.join(", ") : "Nobody yet (no group chosen)"
   end

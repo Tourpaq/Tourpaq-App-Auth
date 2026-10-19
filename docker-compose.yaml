@@ -28,7 +28,9 @@ services:
       - "3050"
     environment:
       # --- Rails (required in production for signing cookies) ---
-      SECRET_KEY_BASE: "${SECRET_KEY_BASE:?Set SECRET_KEY_BASE in .env (generate with: openssl rand -hex 64)}"
+      # A bare `:?`, never `:?message`: Coolify's compose parser takes the message for a default and fills it
+      # in as the value, so a missing key would become the message instead of a refusal. See .env.example.
+      SECRET_KEY_BASE: "${SECRET_KEY_BASE:?}"
       # --- The three hosts (SPECS.md §24.1). APP_URL is the issuer, exactly. ---
       APP_URL: "${APP_URL:-https://auth.app.journeybooking.eu}"
       INDEX_URL: "${INDEX_URL:-https://index.app.journeybooking.eu}"

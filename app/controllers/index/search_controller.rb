@@ -1,6 +1,6 @@
 # Search (SPECS.md §24.3): the full results at /search?q=…, and /search.json, the viewer's whole index for the
 # as-you-type box in the sidebar (fetched once per page, filtered in the browser). Both hold only what the viewer may
-# see (Index::Entry.visible_to), so the JSON is private to the user and never stored by the browser.
+# see (Index::Entry.visible_to, Index::Doc.visible_to), so the JSON is private to the user and never stored by the browser.
 class Index::SearchController < Index::ContentController
   def index
     respond_to do |format|
@@ -24,7 +24,7 @@ class Index::SearchController < Index::ContentController
     terms = query.downcase.split
     return [] if terms.empty?
 
-    Index::Doc.includes(:doc_section).ordered.select do |doc|
+    Index::Doc.visible_to(index_viewer).includes(:doc_section).ordered.select do |doc|
       text = [ doc.title, doc.summary, doc.body ].join(" ").downcase
       terms.all? { |term| text.include?(term) }
     end
@@ -39,7 +39,7 @@ class Index::SearchController < Index::ContentController
         icon: entry.icon_url? ? nil : entry.icon, links: entry.links.map(&:label)
       }
     end
-    docs = Index::Doc.includes(:doc_section).ordered.map do |doc|
+    docs = Index::Doc.visible_to(index_viewer).includes(:doc_section).ordered.map do |doc|
       { name: doc.title, description: doc.summary, group: "Docs", href: doc.path }
     end
     entries + docs

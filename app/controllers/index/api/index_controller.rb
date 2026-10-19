@@ -10,8 +10,8 @@
 #
 # WWW's response shape, unchanged (fields may be added, never renamed or removed without bumping VERSION; the panel may
 # be an old version on somebody's machine). Added: per group `visibility`; per app `app` (the auth app's slug),
-# `role` and `roles` (the viewer's role(s) in it), `visibility`. "Your apps" (auth apps without an entry, as on the
-# front page) is the first group (slug "your-apps"). Every URL is absolute, on INDEX_URL (never the Host header).
+# `role` and `roles` (the viewer's role(s) in it), `visibility`. "Your apps" (auth apps without a visible entry; the front
+# page also moves the apps' entries there) is the first group (slug "your-apps"). Every URL is absolute, on INDEX_URL (never the Host header).
 class Index::Api::IndexController < Index::BaseController
   VERSION = 1
 
@@ -44,7 +44,7 @@ class Index::Api::IndexController < Index::BaseController
       site: { title: site.title, brand: site.brand_or_title, url: absolute("/") },
       updated_at: last_updated_at&.iso8601,
       groups: groups,
-      docs: Index::Doc.includes(:doc_section).ordered.map { |doc| doc_json(doc) }
+      docs: Index::Doc.visible_to(viewer).includes(:doc_section).ordered.map { |doc| doc_json(doc) }
     }
   end
 

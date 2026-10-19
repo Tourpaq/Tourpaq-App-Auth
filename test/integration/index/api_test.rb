@@ -71,6 +71,14 @@ class Index::ApiTest < ActionDispatch::IntegrationTest
     assert_equal [ "Apps" ], body["groups"].map { |g| g["name"] }
     assert_equal %w[IRM Salesview], body["groups"].first["apps"].map { |a| a["name"] }
     assert_equal "responder", body["groups"].first["apps"].first["role"]
+    assert_equal [ "App deployment" ], body["docs"].map { _1["title"] }
+
+    groups(:ro_dev).update!(staff: false) # alice is now like a contractor: her apps, no content for all staff
+    api(token)
+    body = response.parsed_body
+    assert_equal [ "your-apps" ], body["groups"].map { |g| g["slug"] }
+    assert_equal %w[IRM], body["groups"].first["apps"].map { |a| a["name"] }
+    assert_empty body["docs"]
   end
 
   test "site paths in links and icons become absolute; entries without a section are still listed" do

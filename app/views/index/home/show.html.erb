@@ -23,7 +23,9 @@
     <section class="ix-group">
       <h2 id="your-apps">Your apps <span class="ix-h2-note">Signed in as <%= current_user.email %></span></h2>
       <div class="ix-grid">
-        <%= render partial: "index/shared/app_card", collection: @apps, as: :access %>
+        <% @apps.each do |app| %>
+          <%= app.is_a?(Index::Entry) ? render("index/shared/card", entry: app) : render("index/shared/app_card", access: app) %>
+        <% end %>
       </div>
     </section>
   <% end %>

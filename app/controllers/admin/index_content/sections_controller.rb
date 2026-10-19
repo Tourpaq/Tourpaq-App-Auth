@@ -1,5 +1,5 @@
 # Sections of the index (WWW's groups) on the admin host: name, layout (cards on the front page, or a table page),
-# visibility (everyone signed in, or the chosen auth groups), order. Deleting keeps the entries, without a section.
+# visibility (all Tourpaq staff, or the chosen auth groups), order. Deleting keeps the entries, without a section.
 # Audited index.section.created / updated / deleted.
 class Admin::IndexContent::SectionsController < Admin::IndexContent::BaseController
   before_action :set_section, only: %i[edit update destroy]

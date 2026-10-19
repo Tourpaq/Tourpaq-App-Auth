@@ -16,8 +16,9 @@ module Index::ContentHelper
     end
   end
 
+  # The doc sections the viewer may see that have docs.
   def index_doc_sections
-    @index_doc_sections ||= Index::DocSection.ordered.includes(:docs).select { |s| s.docs.any? }
+    @index_doc_sections ||= Index::DocSection.visible_to(index_viewer).ordered.includes(:docs).select { |s| s.docs.any? }
   end
 
   def index_last_updated_at

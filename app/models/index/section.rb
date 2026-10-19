@@ -1,9 +1,10 @@
 # A menu group of the index (WWW "category"). `layout` is how it is shown: "cards" on the front page (WWW's
 # audience everyone), or "table": a page of its own with a compact, filterable table and a tile on the front page
-# (WWW's technical). `visibility` is who sees it: "everyone" signed in, or only members of the chosen auth groups
-# (SPECS.md §24.3). A section restricted to groups with no group chosen is seen by nobody (the admin overview lists it).
+# (WWW's technical). `visibility` is who sees it: "everyone" is all Tourpaq staff (Index::Viewer#staff?), "groups"
+# only members of the chosen auth groups (SPECS.md §24.3). A section restricted to groups with no group chosen is seen
+# by nobody (the admin overview lists it).
 #
-#   Index::Section.visible_to(viewer)    # in the query: everyone's, plus those of the viewer's groups
+#   Index::Section.visible_to(viewer)    # in the query: the viewer's groups', plus everyone's for staff
 class Index::Section < ApplicationRecord
   include Index::Sluggable
 
@@ -33,9 +34,9 @@ class Index::Section < ApplicationRecord
   # The ids of the sections the viewer may see, as a subquery.
   def self.visible_ids(viewer)
     base = unscoped
-    base.where(visibility: "everyone")
-        .or(base.where(visibility: "groups", id: Index::SectionGroup.where(group_id: viewer.group_ids).select(:section_id)))
-        .select(:id)
+    ids = base.where(visibility: "groups", id: Index::SectionGroup.where(group_id: viewer.group_ids).select(:section_id))
+    ids = ids.or(base.where(visibility: "everyone")) if viewer.staff?
+    ids.select(:id)
   end
 
   def table? = layout == "table"
@@ -45,9 +46,9 @@ class Index::Section < ApplicationRecord
   # What the API's `audience` field has always said (WWW): "everyone" for cards, "technical" for tables.
   def audience = table? ? "technical" : "everyone"
 
-  # "Everyone signed in" or "DK Tech, RO DevOps" (or "nobody yet").
+  # "All Tourpaq staff" or "DK Tech, RO DevOps" (or "nobody yet").
   def visibility_label
-    return "Everyone signed in" unless restricted?
+    return Index::STAFF_LABEL unless restricted?
     names = groups.map(&:name).sort
     names.any? ? names.join(", ") : "Nobody yet (no group chosen)"
   end

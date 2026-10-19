@@ -78,16 +78,19 @@ class SeedsTest < ActiveSupport::TestCase
     assert_equal [ "DK Tech", "RO DevOps" ], Index::Section.find_by!(name: "DevOps").groups.map(&:name).sort
     assert_equal %w[Apps Reporting], Index::Section.where(visibility: "everyone").ordered.pluck(:name)
 
-    # A user of DK Tech sees the technical sections; a user with only the Dashboard sees its card but not them.
+    # The seeded groups are staff. A user of DK Tech sees the technical sections; a user with only Home (a customer,
+    # in no staff group) sees none of the content, only Home under "Your apps".
+    assert_equal [ true ], Group.distinct.pluck(:staff)
     mwi = User.find_by_email("mwi@tourpaq.com")
     assert Index::Section.visible_to(Index::Viewer.new(mwi)).exists?(name: "Databases")
-    someone = User.create!(email: "someone@tourpaq.com")
-    role = App.find_by!(slug: "home").add_role!("Support", permissions: %w[module:customers:view])
-    Grant.create!(app: App.find_by!(slug: "home"), subject: someone, app_role: role)
+    someone = User.create!(email: "someone@bravo.example")
+    home = App.find_by!(slug: "home")
+    Grant.create!(app: home, subject: someone, app_role: home.add_role!("Support", permissions: %w[module:customers:view]))
     viewer = Index::Viewer.new(someone)
-    assert_not Index::Section.visible_to(viewer).exists?(name: "Databases")
-    assert Index::Entry.visible_to(viewer).exists?(slug: "home")
-    assert_not Index::Entry.visible_to(viewer).exists?(slug: "azure-cost-overview")
+    assert_empty Index::Section.visible_to(viewer)
+    assert_empty Index::Entry.visible_to(viewer)
+    assert_empty Index::Doc.visible_to(viewer)
+    assert_equal [ home ], viewer.your_apps([]).map(&:app)
   end
 
   test "running again changes nothing, and edits survive" do

@@ -3,6 +3,7 @@
   <div>
     <h1><%= @group.name %></h1>
     <% if @group.description.present? %><p class="muted"><%= @group.description %></p><% end %>
+    <p class="muted small"><%= @group.staff? ? "Tourpaq staff: members see what index.app shows to all staff." : "Not staff: members see only their own apps and what index.app shows to this group." %></p>
   </div>
   <div class="actions"><%= link_to "Edit", edit_admin_group_path(@group), class: "btn-secondary" %></div>
 </div>

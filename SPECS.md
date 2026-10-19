@@ -219,6 +219,9 @@ through `sign_in_admin`; the index host has no such stub, tests sign in through 
 
 - A name, a description and members. A user can be in any number of groups.
 - Seeded: **DK Tech** (the four admins), **RO DevOps**, **RO Dev**, the last two empty.
+- **Tourpaq staff** (`staff`, a box on the group): its members are Tourpaq's own people and see the index's content
+  for all staff (§24.3). A group of customers or contractors leaves it off. A new group is not staff until an admin
+  ticks it; the seeded groups are, and every group that existed on 19 Oct 2026 was made staff by the migration.
 - Group membership is managed in the auth app only. Entra groups are not read: that would need either the
   `groups` claim or Graph, and the registration asks for neither.
 
@@ -1455,10 +1458,15 @@ the forwarded GET (POST stays accepted). Tested end to end in `test/integration/
   - site settings;
   - search (`/` key, live results).
 - **An entry can be tied to an auth App.** It is then shown only to users with access to that app, and shows their
-  role(s). Entries that are not apps (servers, Coolify, Grafana, third-party tools) and whole sections have a
-  **visibility**: everyone signed in, or only the chosen auth groups. This replaces WWW's everyone/technical
-  audience, imported as: everyone → everyone signed in; technical → the groups DK Tech and RO DevOps. Admins
-  adjust it later.
+  role(s). Entries that are not apps (servers, Coolify, Grafana, third-party tools), whole sections and doc sections
+  have a **visibility**: all Tourpaq staff, or only the chosen auth groups. This replaces WWW's everyone/technical
+  audience, imported as: everyone → all staff; technical → the groups DK Tech and RO DevOps. Admins adjust it later.
+- **Audiences** (19 Oct 2026): the index is Tourpaq's internal map, not for everyone who can sign in.
+  - **Tourpaq staff** are admins and members of a group marked staff (§5.2). They see what is for all staff, plus
+    what is shown to their groups. Customer care sees the staff content but not the developers' sections, which
+    are shown only to DK Tech, RO DevOps and so on.
+  - **Contractors** are in a group that is not staff. They see their apps and what is shown to their group.
+  - **Customers** are in no staff group either. By default they see only their apps (today Home), under "Your apps".
 - Markdown is always sanitised, as WWW's `Markdown.render` does. The index code lives in its own namespace and
   never touches tokens, keys or sessions other than through the index host's session concern.
 - **Extension** ("Tourpaq Index", moved to `clients/index-extension`):
@@ -1490,8 +1498,8 @@ the forwarded GET (POST stays accepted). Tested end to end in `test/integration/
   `/index/sections`, `/index/access_levels`, `/index/login_methods`, `/index/docs`, `/index/doc_sections`, `/index/site`
   ("Index content" in the admin sidebar).
 - **Sections** have a `layout` (`cards`: cards on the front page; `table`: a page of its own with a compact, filterable
-  table and a tile on the front page; what WWW's audience did for presentation) and a `visibility` (`everyone`
-  signed in, or `groups` with the chosen auth groups). A section restricted to groups with none chosen is seen by
+  table and a tile on the front page; what WWW's audience did for presentation) and a `visibility` (`everyone`: all
+  Tourpaq staff, or `groups` with the chosen auth groups). A section restricted to groups with none chosen is seen by
   nobody (the admin overview lists it), and deleting a group takes it out of the choice: visibility only ever narrows.
 - **Entries** tied to an auth App (`app_id`) are shown to the users for whom `EffectiveRole` gives access to that app
   (active app, active user, a direct "no access" wins), with their role(s) as the auth app's badges (`effective_role_label`);
@@ -1501,12 +1509,25 @@ the forwarded GET (POST stays accepted). Tested end to end in `test/integration/
   are SQL subqueries over the viewer's group ids and accessible app ids (`Index::Viewer`); the front page, the menu
   counts, section pages, entry pages (another app's, another group's or a hidden section's entry is a 404, like an
   unknown one), search (`/search` and `/search.json`, `Cache-Control: private, no-store`, so the browser never serves
-  one user's index to the next user of the same browser) and the API all go through them. Docs
-  have no visibility of their own: they are for everyone signed in.
+  one user's index to the next user of the same browser) and the API all go through them.
+- *Built (19 Oct 2026), audiences:*
+  - **Staff.** `groups.staff` (migration `20261019090001`, which made every existing group staff) and
+    `Index::Viewer#staff?`: an active admin, or a member of a staff group. `everyone` in a visibility means staff.
+    In `visible_ids`, the `everyone` branch is added to the query only for staff. A nil, disabled or non-staff
+    viewer therefore matches only their groups' rows and the entries of apps they have access to. An app's entry
+    still needs a visible section, so a customer gets the app's own card under "Your apps" instead.
+  - **Docs** follow their doc section's `visibility` (`index_doc_sections.visibility`, `Index::DocSectionGroup`,
+    edited like a section's and audited with its groups). `Index::DocSection.visible_to` and `Index::Doc.visible_to`
+    (a doc in no section is for staff) are used by the menu, the front page's tiles, `/docs/…` (any other doc is a
+    404), both searches and the API.
+  - **The admin overview** lists doc sections seen by nobody, and warns while no group is staff, since the staff
+    content is then seen by admins only. The group form has the "Tourpaq staff" box (audited in `group.created` /
+    `group.updated`), the list shows a `staff` pill and the group's page says what its members see.
 - **The front page**: the expiring-token reminder; WWW's hero (site title, tagline, search) with an "Admin" link for
-  admins; **"Your apps"**: the auth apps the user has access to (shown in the launcher) that no visible entry stands
-  for, with their role and its source, so nothing of the old launcher is lost (the app `index` itself is left out); the
-  `cards` sections as WWW's cards; entries without a section; tiles into the `table` sections and the docs. The
+  admins; **"Your apps"**: every auth app the user has access to (shown in the launcher), with their role and its
+  source, so nothing of the old launcher is lost (the app `index` itself is left out). An app with a visible entry is
+  shown as that entry's card, which is then not repeated in its section on the front page (since 19 Oct 2026: before,
+  such an app appeared only further down in its section and was missed). Then come the `cards` sections as WWW's cards; entries without a section; tiles into the `table` sections and the docs. The
   sidebar (layouts/index) carries the search box (`/` focuses it, results as you type from `/search.json`), the
   visible sections with their visible entries' count, the docs, and "Updated … ago".
 - **Validation and sanitising** as WWW: `Index::URL_FORMAT` (WWW's `App::URL_FORMAT`: http(s) or a site path) on URLs,
@@ -1559,7 +1580,7 @@ the forwarded GET (POST stays accepted). Tested end to end in `test/integration/
   brings in line what differs, keeping the export's `created_at` / `updated_at` on new rows; audience everyone →
   `cards` + everyone, technical → `table` + DK Tech and RO DevOps (a missing group is reported and left out); an entry
   whose URL host is an active app's host is tied to that app, and an entry that is already tied is never untied (no
-  matching host, or the App disabled, would otherwise show it to everyone signed in; only an admin unties). It never
+  matching host, or the App disabled, would otherwise show it to all staff; only an admin unties). It never
   deletes: rows only in the auth app are listed
   ("keep"). A row changed in the auth app after the last **applied** import is left as it is (a skip), so it can be
   re-run safely; a row the models refuse is a skip with the reason. Another format or version, or a file without the

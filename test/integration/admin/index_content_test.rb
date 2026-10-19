@@ -42,6 +42,16 @@ class Admin::IndexContentTest < ActionDispatch::IntegrationTest
     assert_select "input[name='index_entry[name]'][value=KPI]"
   end
 
+  test "the overview: a doc section seen by nobody, and a warning while no group is staff" do
+    get "/index"
+    assert_select ".flash-alert", { text: /No group is marked/, count: 0 }
+    index_doc_sections(:deployment).update!(visibility: "groups")
+    Group.update_all(staff: false)
+    get "/index"
+    assert_select "li", /Doc section\s+Deployment/
+    assert_select ".flash-alert", /No group is marked Tourpaq staff/
+  end
+
   test "add an entry with links, audited" do
     assert_difference -> { Index::Entry.count } => 1, -> { Index::Link.count } => 2 do
       post "/index/entries", params: { index_entry: {
@@ -154,6 +164,24 @@ class Admin::IndexContentTest < ActionDispatch::IntegrationTest
     sign_in_index users(:alice), path: "/docs/deployment/rolling-back"
     assert_response :success
     assert_select "h1", "Rolling back"
+  end
+
+  test "doc sections: shown to all staff or to the chosen groups, audited" do
+    get "/index/doc_sections/#{index_doc_sections(:deployment).id}/edit"
+    assert_select "select[name='index_doc_section[visibility]'] option[selected]", "All Tourpaq staff"
+    post "/index/doc_sections", params: { index_doc_section: { title: "Runbooks", visibility: "groups",
+                                                               group_ids: [ "", groups(:ro_devops).id.to_s ] } }
+    section = Index::DocSection.find_by!(key: "runbooks")
+    assert_equal [ "groups", [ "RO DevOps" ] ], [ section.visibility, section.groups.map(&:name) ]
+    assert_equal [ "RO DevOps" ], audit("index.doc_section.created").data["groups"]
+
+    patch "/index/doc_sections/#{section.id}", params: { index_doc_section: { visibility: "everyone", group_ids: [ "", groups(:ro_devops).id.to_s ] } }
+    assert_redirected_to "/index/doc_sections"
+    assert_empty section.reload.groups, "all staff means no groups"
+    changes = audit("index.doc_section.updated").data["changes"]
+    assert_equal [ [ "groups", "everyone" ], [ [ "RO DevOps" ], [] ] ], changes.values_at("visibility", "groups")
+    get "/index/doc_sections"
+    assert_select "td", "All Tourpaq staff"
   end
 
   test "doc sections and site settings, audited" do

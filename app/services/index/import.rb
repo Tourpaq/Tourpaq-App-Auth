@@ -9,11 +9,11 @@
 # slug; access levels and login methods by key; apps become entries by slug; an app's links by label (case does not
 # matter); doc sections by key; docs by section and slug.
 #
-# Mapping: a category's audience "everyone" becomes layout cards, visible to everyone signed in; "technical" becomes
+# Mapping: a category's audience "everyone" becomes layout cards, visible to all Tourpaq staff; "technical" becomes
 # layout table, visible to the groups DK Tech and RO DevOps (a missing group is left out and reported, so such a
 # section is seen by fewer people, never by more). An app whose URL's host is an active auth App's host is tied to that
 # App (then only its users see it); an entry that is already tied is never untied by the import (no host matching, or
-# the App disabled, would otherwise show it to everyone signed in). A new row keeps the export's created_at and
+# the App disabled, would otherwise show it to all staff). A new row keeps the export's created_at and
 # updated_at.
 #
 # Rules: a new row is created; an existing row that differs is brought in line (a change), except that a row changed
@@ -222,7 +222,7 @@ class Index::Import
       links = (links_by_app[row["id"]] || []).sort_by { [ _1["position"].to_i, _1["id"].to_i ] }
       existing = Index::Entry.find_by(slug: row["slug"])
       # Never untie: an entry tied to an App is seen by that App's users only, and its own visibility is not used (it
-      # is "everyone"), so clearing the tie would show it to everyone signed in. Only an admin unties.
+      # is "everyone"), so clearing the tie would show it to all staff. Only an admin unties.
       attrs.delete(:app_id) if attrs[:app_id].nil? && existing&.app_id
       entry = upsert("entry", row["slug"], existing, attrs, row: row) do
         Index::Entry.new(slug: row["slug"]).tap do |fresh|

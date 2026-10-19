@@ -1,11 +1,14 @@
 dk_tech:
   name: DK Tech
   description: Tourpaq tech team in Denmark.
+  staff: true
 
 ro_devops:
   name: RO DevOps
   description: DevOps in Romania.
+  staff: true
 
 ro_dev:
   name: RO Dev
   description: Developers in Romania.
+  staff: true

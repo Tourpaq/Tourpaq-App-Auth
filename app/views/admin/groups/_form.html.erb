@@ -8,6 +8,11 @@
     <%= f.label :description %>
     <%= f.text_area :description, rows: 2 %>
   </div>
+  <div class="field">
+    <label class="check"><%= f.check_box :staff %> Tourpaq staff</label>
+    <p class="hint">Members see what index.app shows to all Tourpaq staff. Leave it off for customers and contractors:
+      they see only their own apps and what is shown to their group.</p>
+  </div>
   <div class="actions">
     <%= f.submit group.new_record? ? "Create group" : "Save" %>
     <%= link_to "Cancel", group.new_record? ? admin_groups_path : admin_group_path(group), class: "btn-secondary" %>

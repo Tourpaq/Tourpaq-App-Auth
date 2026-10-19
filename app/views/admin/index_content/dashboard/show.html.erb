@@ -2,7 +2,9 @@
 <%= render "admin/index_content/tabs" %>
 <h1>Index content</h1>
 <p class="muted">What index.app shows (SPECS.md §24.3). Changes are live as soon as you save. An entry tied to an app is shown
-  only to users with access to it; sections and other entries are shown to everyone signed in or to the chosen groups.</p>
+  only to users with access to it; sections, doc sections and other entries are shown to all Tourpaq staff (admins and
+  members of a group marked staff) or to the chosen groups. Customers and contractors see only their apps and what is
+  shown to their groups.</p>
 
 <div class="cards">
   <% @counts.each do |label, (count, path)| %>
@@ -37,11 +39,17 @@
   </div>
 <% end %>
 
-<% if @unseen_sections.any? || @unseen_entries.any? %>
+<% if @no_staff_group %>
+  <p class="flash flash-alert">No group is marked <strong>Tourpaq staff</strong>, so what is shown to all staff is seen by admins
+    only. Tick “Tourpaq staff” on the internal <%= link_to "groups", admin_groups_path %>.</p>
+<% end %>
+
+<% if @unseen_sections.any? || @unseen_entries.any? || @unseen_doc_sections.any? %>
   <h2>Seen by nobody <span class="muted small">restricted to groups, but no group chosen</span></h2>
   <ul class="plain-list">
     <% @unseen_sections.each do |section| %><li>Section <%= link_to section.name, edit_admin_index_section_path(section) %></li><% end %>
     <% @unseen_entries.each do |entry| %><li>Entry <%= link_to entry.name, edit_admin_index_entry_path(entry) %></li><% end %>
+    <% @unseen_doc_sections.each do |section| %><li>Doc section <%= link_to section.title, edit_admin_index_doc_section_path(section) %></li><% end %>
   </ul>
 <% end %>
 

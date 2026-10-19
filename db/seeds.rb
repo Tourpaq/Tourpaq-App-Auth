@@ -1,4 +1,4 @@
-# The starting point (SPECS.md §1, §5.1, §5.2, §23, §24): the DK Tech admins, three groups, the apps we know
+# The starting point (SPECS.md §1, §5.1, §5.2, §23, §24): the DK Tech admins, three staff groups, the apps we know
 # with their roles, DK Tech as admin in every app that has an "admin" role, the apps' clients, and the internal
 # clients of the index and admin hosts. Home, formerly the Dashboard (at home.app, §24.1), is registered with
 # multiple roles and no roles yet (its standard roles or its import create them, §23.2, §23.5).
@@ -13,7 +13,8 @@ groups = {
   "RO DevOps" => "DevOps in Romania.",
   "RO Dev" => "Developers in Romania."
 }.to_h do |name, description|
-  [ name, Group.find_or_create_by!(name: name) { _1.description = description } ]
+  # Tourpaq's own people: they see the index's content for all staff (§24.3).
+  [ name, Group.find_or_create_by!(name: name) { _1.description = description; _1.staff = true } ]
 end
 
 # Pre-created and unbound: matched by email at their first Entra sign-in (§3.2).

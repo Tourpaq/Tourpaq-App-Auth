@@ -10,6 +10,18 @@
     <p class="hint">Changing it changes every doc's URL in this section.</p>
   </div>
   <div class="field">
+    <%= f.label :visibility, "Shown to" %>
+    <%= f.select :visibility, Index::VISIBILITY_OPTIONS %>
+  </div>
+  <div class="field">
+    <span class="hint">Groups (with “Only these groups”)</span>
+    <div class="ix-group-choices">
+      <%= f.collection_check_boxes :group_ids, Group.ordered, :id, :name do |b| %>
+        <label class="check"><%= b.check_box %> <%= b.text %></label>
+      <% end %>
+    </div>
+  </div>
+  <div class="field">
     <%= f.label :position, "Order" %>
     <%= f.number_field :position %>
   </div>

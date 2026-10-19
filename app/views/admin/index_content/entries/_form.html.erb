@@ -75,7 +75,7 @@
     </div>
     <div class="field">
       <%= f.label :visibility %>
-      <%= f.select :visibility, [ [ "Everyone signed in", "everyone" ], [ "Only these groups", "groups" ] ] %>
+      <%= f.select :visibility, Index::VISIBILITY_OPTIONS %>
     </div>
     <div class="field">
       <span class="hint">Groups (with “Only these groups”)</span>

@@ -1,4 +1,4 @@
-# salesview: everyone signed in. sql_bravo: in the DK Tech / RO DevOps table section. irm: tied to the auth app IRM.
+# salesview: all Tourpaq staff. sql_bravo: in the DK Tech / RO DevOps table section. irm: tied to the auth app IRM.
 salesview:
   slug: salesview
   name: Salesview

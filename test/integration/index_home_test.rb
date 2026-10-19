@@ -26,14 +26,31 @@ class IndexHomeTest < ActionDispatch::IntegrationTest
     assert_select ".sidebar .nav-section", text: "Technical", count: 0
   end
 
-  test "apps with access that no entry stands for are under Your apps, with the role and where it comes from" do
+  test "Your apps holds every app with access, an app with an entry as that entry's card, not repeated below" do
     Grant.create!(app: apps(:kpi), subject: users(:alice), app_role: app_roles(:kpi_viewer))
     sign_in_index users(:alice)
-    assert_select "#your-apps"
-    assert_select ".ix-app-card", 1, "IRM has an entry, so only KPI is here"
+    your_apps = css_select("#your-apps + .ix-grid .ix-card-name").map { _1.text.strip }
+    assert_equal [ "IRM", "KPI" ], your_apps
+    assert_select ".ix-app-card", 1, "KPI has no entry: the app's own card"
     assert_select ".ix-app-card .ix-card-name a[href='https://kpi.app.journeybooking.eu']", "KPI"
     assert_select ".ix-app-card .badge.role-viewer", "viewer"
     assert_select ".ix-app-card .ix-card-role", /direct/
+    assert_select "#apps + .ix-grid .ix-card-name", text: "IRM", count: 0
+    assert_select "#apps + .ix-grid .ix-card-name", text: "Salesview"
+  end
+
+  test "a customer (in no staff group) sees only their apps: no sections, tiles or docs" do
+    Grant.create!(app: apps(:irm), subject: users(:carol), app_role: app_roles(:irm_viewer))
+    sign_in_index users(:carol)
+    assert_equal [ "IRM" ], css_select(".ix-card-name").map { _1.text.strip }
+    assert_select ".ix-app-card", 1, "IRM's entry is in Apps (for all staff), so the app's own card"
+    assert_select ".ix-tile", 0
+    assert_select ".sidebar a[href^='/groups/']", 0
+    assert_select ".sidebar a[href^='/docs/']", 0
+    get "/groups/apps"
+    assert_response :not_found
+    get "/apps/salesview"
+    assert_response :not_found
   end
 
   test "a known icon name is drawn as SVG for an app, anything else as text or initials" do

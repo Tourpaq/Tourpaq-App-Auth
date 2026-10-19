@@ -1,4 +1,5 @@
-# Groups (SPECS.md §5.2, §11.2): name, description, members, and a grant per app. Audited
+# Groups (SPECS.md §5.2, §11.2): name, description, Tourpaq staff or not (who sees the index's content for all staff,
+# §24.3), members, and a grant per app. Audited
 # group.created / group.updated / group.deleted; deleting a group removes its grants first, each
 # audited grant.removed with the members' before/after roles.
 class Admin::GroupsController < Admin::BaseController
@@ -22,7 +23,7 @@ class Admin::GroupsController < Admin::BaseController
   def create
     @group = Group.new(group_params)
     if @group.save
-      AuditEvent.record("group.created", subject: @group, data: { name: @group.name })
+      AuditEvent.record("group.created", subject: @group, data: { name: @group.name, staff: @group.staff })
       redirect_to admin_group_path(@group), notice: "Group #{@group.name} is created. Add members and give it access."
     else
       render :new, status: :unprocessable_entity
@@ -67,5 +68,5 @@ class Admin::GroupsController < Admin::BaseController
     @group = Group.find(params[:id])
   end
 
-  def group_params = params.expect(group: %i[name description])
+  def group_params = params.expect(group: %i[name description staff])
 end
