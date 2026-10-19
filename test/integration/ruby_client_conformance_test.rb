@@ -64,14 +64,14 @@ class RubyClientConformanceTest < ActionDispatch::IntegrationTest
 
   test "a permission app (§23.2): role list and permissions at login, in the check, members and introspection; the catalogue push" do
     dashboard = create_dashboard_app(catalogue: false)
-    secret = secret_for(Client.find_by!(client_id: "dashboard-web"))
+    secret = secret_for(Client.find_by!(client_id: "home-web"))
     grant_dashboard(users(:alice), "Support")
     grant_dashboard(groups(:ro_dev), "Finance readers")
-    configure_gem("dashboard-web", secret, "https://home.app.journeybooking.eu/sso/callback")
+    configure_gem("home-web", secret, "https://home.app.journeybooking.eu/sso/callback")
     permissions = %w[management:finance:view module:customers:view module:tasks:view]
 
     pushed = TourpaqAuth::Catalogue.push(DashboardHelpers::DASHBOARD_CATALOGUE.map { _1.transform_keys(&:to_sym) })
-    assert_equal [ "dashboard", 5 ], [ pushed.app, pushed.count ]
+    assert_equal [ "home", 5 ], [ pushed.app, pushed.count ]
     assert_equal DashboardHelpers::DASHBOARD_CATALOGUE.map { _1["key"] }, dashboard.reload.catalogue_keys
     assert_equal({}, pushed.unknown)
 

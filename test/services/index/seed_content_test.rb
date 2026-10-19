@@ -7,7 +7,7 @@ class Index::SeedContentTest < ActiveSupport::TestCase
   setup do
     [ Index::Link, Index::EntryGroup, Index::Entry, Index::Doc, Index::DocSection, Index::SectionGroup, Index::Section,
       Index::AccessLevel, Index::LoginMethod, Index::Site ].each(&:delete_all)
-    @dashboard = App.create!(slug: "dashboard", name: "Dashboard", url: "https://home.app.journeybooking.eu", multiple_roles: true)
+    @dashboard = App.create!(slug: "home", name: "Dashboard", url: "https://home.app.journeybooking.eu", multiple_roles: true)
     @azure = App.new(slug: "azure-cost", name: "Azure Cost", url: "https://azurecost.app.journeybooking.eu")
     @azure.roles.build(key: "viewer", position: 1)
     @azure.save!
@@ -38,14 +38,14 @@ class Index::SeedContentTest < ActiveSupport::TestCase
     assert_equal "index.seeded", AuditEvent.last.action
   end
 
-  test "Tourpaq Home is now the Dashboard at home.app, tied to its app; Azure Cost is tied too; no other card points at home.app" do
+  test "Tourpaq Home (formerly the Dashboard) at home.app, tied to its app; Azure Cost is tied too; no other card points at home.app" do
     seed
     dashboard = Index::Entry.find_by!(slug: "home")
-    assert_equal [ "Tourpaq Dashboard", "https://home.app.journeybooking.eu", "sso", @dashboard ],
+    assert_equal [ "Tourpaq Home", "https://home.app.journeybooking.eu", "sso", @dashboard ],
                  [ dashboard.name, dashboard.url, dashboard.login_method&.key, dashboard.app ]
     assert_equal [ dashboard ], Index::Entry.where("url LIKE ?", "%//home.app.journeybooking.eu%").to_a
     assert_equal @azure, Index::Entry.find_by!(slug: "azure-cost-overview").app
-    assert_empty Index::Entry.where("name LIKE ?", "%Tourpaq Home%")
+    assert_equal [ dashboard ], Index::Entry.where("name LIKE ?", "%Tourpaq Home%").to_a, "one Home card, not the old one next to it"
   end
 
   test "a NetBird resource already on a card adds its address instead of a duplicate" do

@@ -33,26 +33,26 @@ class SeedsTest < ActiveSupport::TestCase
     assert_equal "https://index.app.journeybooking.eu", App.find_by!(slug: "index").url
     %w[logs azure-cost index].each { assert_equal %w[viewer admin], App.find_by!(slug: _1).role_keys }
 
-    App.where.not(slug: "dashboard").find_each do |app|
+    App.where.not(slug: "home").find_each do |app|
       assert_equal "admin, from DK Tech", EffectiveRole.for(User.find_by_email("mwi@tourpaq.com"), app).to_s, app.slug
     end
 
-    # The Dashboard (§23): multiple roles, no roles yet (the import creates them), its scopes and claims. It stays at
-    # home.app (§24.1).
-    dashboard = App.find_by!(slug: "dashboard")
-    assert_equal [ "Dashboard", "https://home.app.journeybooking.eu", true, "dashboard_roles", "dashboard_permissions",
+    # Home, formerly the Dashboard (§23): multiple roles, no roles yet (its standard roles or the import create them),
+    # its scopes and claims, client home-web. It stays at home.app (§24.1).
+    dashboard = App.find_by!(slug: "home")
+    assert_equal [ "Home", "https://home.app.journeybooking.eu", true, "home_roles", "home_permissions",
                    "admin:access:manage", %w[public all] ],
                  [ dashboard.name, dashboard.url, dashboard.multiple_roles?, dashboard.role_claim, dashboard.permissions_claim,
                    dashboard.admin_permission, dashboard.token_scopes ]
     assert_empty dashboard.roles
     assert_empty dashboard.grants
-    dashboard_web = Client.find_by!(client_id: "dashboard-web")
+    dashboard_web = Client.find_by!(client_id: "home-web")
     assert_equal [ dashboard, "web" ], [ dashboard_web.app, dashboard_web.kind ]
     assert_equal [ "https://home.app.journeybooking.eu/sso/callback", "http://localhost:4013/sso/callback" ], dashboard_web.redirect_uris
     assert_equal [ "https://home.app.journeybooking.eu/" ], dashboard_web.post_logout_redirect_uris
 
     # The index host signs in as the internal client "index" (§24.1): no index-web.
-    assert_equal %w[admin azure-cost-web dashboard-web index index-extension irm-extension irm-web kpi-web logs-web], Client.order(:client_id).pluck(:client_id)
+    assert_equal %w[admin azure-cost-web home-web index index-extension irm-extension irm-web kpi-web logs-web], Client.order(:client_id).pluck(:client_id)
     web = Client.find_by!(client_id: "irm-web")
     assert web.redirect_uri_allowed?("https://irm.app.journeybooking.eu/sso/callback")
     assert web.redirect_uri_allowed?("http://localhost:3030/sso/callback")
@@ -72,7 +72,7 @@ class SeedsTest < ActiveSupport::TestCase
     seed
     assert_equal "Tourpaq DK Home", Index::Site.current.title
     dashboard = Index::Entry.find_by!(slug: "home")
-    assert_equal [ "Tourpaq Dashboard", "https://home.app.journeybooking.eu", App.find_by!(slug: "dashboard") ],
+    assert_equal [ "Tourpaq Home", "https://home.app.journeybooking.eu", App.find_by!(slug: "home") ],
                  [ dashboard.name, dashboard.url, dashboard.app ]
     assert_equal App.find_by!(slug: "azure-cost"), Index::Entry.find_by!(slug: "azure-cost-overview").app
     assert_equal [ "DK Tech", "RO DevOps" ], Index::Section.find_by!(name: "DevOps").groups.map(&:name).sort
@@ -82,8 +82,8 @@ class SeedsTest < ActiveSupport::TestCase
     mwi = User.find_by_email("mwi@tourpaq.com")
     assert Index::Section.visible_to(Index::Viewer.new(mwi)).exists?(name: "Databases")
     someone = User.create!(email: "someone@tourpaq.com")
-    role = App.find_by!(slug: "dashboard").add_role!("Support", permissions: %w[module:customers:view])
-    Grant.create!(app: App.find_by!(slug: "dashboard"), subject: someone, app_role: role)
+    role = App.find_by!(slug: "home").add_role!("Support", permissions: %w[module:customers:view])
+    Grant.create!(app: App.find_by!(slug: "home"), subject: someone, app_role: role)
     viewer = Index::Viewer.new(someone)
     assert_not Index::Section.visible_to(viewer).exists?(name: "Databases")
     assert Index::Entry.visible_to(viewer).exists?(slug: "home")
@@ -93,8 +93,8 @@ class SeedsTest < ActiveSupport::TestCase
   test "running again changes nothing, and edits survive" do
     seed
     App.find_by!(slug: "irm").update!(name: "Incidents")
-    App.find_by!(slug: "dashboard").update!(token_scope_list: "public internal all")
-    App.find_by!(slug: "dashboard").add_role!("Support", permissions: %w[module:customers:view])
+    App.find_by!(slug: "home").update!(token_scope_list: "public internal all")
+    App.find_by!(slug: "home").add_role!("Support", permissions: %w[module:customers:view])
     User.find_by_email("mwi@tourpaq.com").update!(name: "Mogens Winther")
     Index::Entry.find_by!(slug: "home").update!(name: "Dashboard")
     Index::Entry.find_by!(slug: "salesview").destroy!
@@ -103,8 +103,8 @@ class SeedsTest < ActiveSupport::TestCase
     assert_equal counts, [ User, Group, GroupMembership, App, AppRole, Grant, Client, Index::Entry, Index::Section, Index::Doc ].map(&:count)
     assert_equal "Dashboard", Index::Entry.find_by!(slug: "home").name, "the index is seeded only when empty"
     assert_equal "Incidents", App.find_by!(slug: "irm").name
-    assert_equal %w[public internal all], App.find_by!(slug: "dashboard").token_scopes
-    assert_equal [ "Support" ], App.find_by!(slug: "dashboard").role_keys
+    assert_equal %w[public internal all], App.find_by!(slug: "home").token_scopes
+    assert_equal [ "Support" ], App.find_by!(slug: "home").role_keys
     assert_equal "Mogens Winther", User.find_by_email("mwi@tourpaq.com").name
   end
 end

@@ -1,7 +1,7 @@
 # The starting point (SPECS.md §1, §5.1, §5.2, §23, §24): the DK Tech admins, three groups, the apps we know
 # with their roles, DK Tech as admin in every app that has an "admin" role, the apps' clients, and the internal
-# clients of the index and admin hosts. The Dashboard (at home.app, §24.1) is registered with multiple roles and
-# no roles yet (its import creates them, §23.5).
+# clients of the index and admin hosts. Home, formerly the Dashboard (at home.app, §24.1), is registered with
+# multiple roles and no roles yet (its standard roles or its import create them, §23.2, §23.5).
 #
 # Idempotent: existing rows are found and never changed, so anything edited in the admin UI survives
 # a re-run (the web container seeds on every start). No secrets are created or printed here: client
@@ -56,11 +56,13 @@ apps = [
     icon: "home", url: "https://index.app.journeybooking.eu", web: false,
     roles: [ [ "viewer", "Uses the app" ], [ "admin", "Manages the app" ] ],
     extension: true, extension_ids: [ "cicimfifinjjjnagflnckioghehdpogc" ] }, # clients/index-extension/manifest.json "key"
-  # The Dashboard (SPECS.md §23): permission-carrying roles, several per user. It stays at home.app (§24.1). No roles
-  # here: the import (auth:import_dashboard) creates them from its groups, and the app pushes its permission catalogue.
-  { slug: "dashboard", name: "Dashboard", description: "Customers, management figures, tasks and the team's daily tools.",
+  # Home, formerly the Dashboard (SPECS.md §23, §24.1): permission-carrying roles, several per user, at home.app. No
+  # roles here: the app page's standard roles (StarterRoles) or the import (auth:import_dashboard) create them, and the
+  # app pushes its permission catalogue. Its client is home-web. A database that still has the app as "dashboard" is
+  # renamed by the migration RenameDashboardAppToHome before these seeds run, so it is found here and not created twice.
+  { slug: "home", name: "Home", description: "Customers, management figures, tasks and the team's daily tools.",
     icon: "home", url: "https://home.app.journeybooking.eu", dev_port: 4013,
-    multiple_roles: true, role_claim: "dashboard_roles", admin_permission: "admin:access:manage", token_scopes: %w[public all],
+    multiple_roles: true, role_claim: "home_roles", admin_permission: "admin:access:manage", token_scopes: %w[public all],
     roles: [], post_logout: [ "https://home.app.journeybooking.eu/" ] }
 ]
 

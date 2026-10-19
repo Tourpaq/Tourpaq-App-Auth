@@ -5,7 +5,7 @@
 #   Content-Type: application/json
 #   { "permissions": [ { "key": "module:customers:view", "label": "Customers", "group": "Modules" }, … ] }
 #
-#   200 { "app": "dashboard", "count": 42, "added": [...], "removed": [...], "changed": [...],
+#   200 { "app": "home", "count": 42, "added": [...], "removed": [...], "changed": [...],
 #         "unknown": [ { "role": "Support", "permissions": ["old:key"] } ] }
 #   400 { "error": "invalid_request", "error_description": "…" }   (nothing changed)
 #

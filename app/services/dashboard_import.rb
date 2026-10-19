@@ -12,7 +12,7 @@
 # - Users without an oid (from YouTrack, never signed in): created pre-created only when they are active and hold
 #   a membership; an existing user with the email is used; otherwise skipped.
 # - Inactive users get no grants, and are not disabled here: the Dashboard's "inactive" was about the Dashboard.
-# - Groups become roles of the app "dashboard" with the same name, description and permissions; the
+# - Groups become roles of the app "home" (the Dashboard, now Home) with the same name, description and permissions; the
 #   Administrators group (the system group) becomes "Administrators" with "*". An existing role of that name is
 #   brought in line (a change).
 # - Memberships become direct grants (GrantChange, audited with before/after). A user whose direct grant in the
@@ -34,7 +34,7 @@
 class DashboardImport
   FORMAT = "tourpaq-dashboard-export".freeze
   VERSION = 1
-  APP_SLUG = "dashboard".freeze
+  APP_SLUG = "home".freeze # the Dashboard became Home (SPECS.md §24.1)
   ADMIN_GROUP = "Administrators".freeze
 
   class Refused < StandardError; end
@@ -78,7 +78,7 @@ class DashboardImport
       tokens = lines.select { _1.action == "notify" }
       if tokens.any?
         out << ""
-        out << "Dashboard tokens stop at the cutover; tell their owners to create tpa_dashboard_ tokens (SPECS.md §23.5 step 5):"
+        out << "Dashboard tokens stop at the cutover; tell their owners to create tpa_home_ tokens (SPECS.md §23.5 step 5):"
         out.concat(tokens.map { "  #{_1.subject}: #{_1.detail}" })
       end
       out << "" << "Run again with #{'FORCE=1 ' if previous_at}APPLY=1 to apply." unless applied

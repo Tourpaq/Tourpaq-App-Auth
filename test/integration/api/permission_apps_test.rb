@@ -5,9 +5,9 @@ require "test_helper"
 class Api::PermissionAppsTest < ActionDispatch::IntegrationTest
   setup do
     @dash = create_dashboard_app
-    @client = Client.find_by!(client_id: "dashboard-web")
+    @client = Client.find_by!(client_id: "home-web")
     @secret = secret_for(@client)
-    @auth = basic_auth("dashboard-web", @secret)
+    @auth = basic_auth("home-web", @secret)
     grant_dashboard(users(:alice), "Support")
     grant_dashboard(groups(:ro_dev), "Finance readers")
     on_auth_host!
@@ -17,29 +17,29 @@ class Api::PermissionAppsTest < ActionDispatch::IntegrationTest
 
   test "ID token and userinfo: the role claim is a list, the permissions claim the sorted union" do
     tokens = oidc_login(users(:alice), @client, secret: @secret)
-    claims = verify_id_token(tokens["id_token"], aud: "dashboard-web", nonce: tokens["nonce"])
-    assert_equal [ "Finance readers", "Support" ], claims["dashboard_roles"]
-    assert_equal alice_permissions, claims["dashboard_permissions"]
+    claims = verify_id_token(tokens["id_token"], aud: "home-web", nonce: tokens["nonce"])
+    assert_equal [ "Finance readers", "Support" ], claims["home_roles"]
+    assert_equal alice_permissions, claims["home_permissions"]
     assert_nil claims["dashboard_role"]
 
     get "/oauth/userinfo", headers: { "Authorization" => "Bearer #{tokens['access_token']}" }
-    assert_equal [ [ "Finance readers", "Support" ], alice_permissions ], response.parsed_body.values_at("dashboard_roles", "dashboard_permissions")
+    assert_equal [ [ "Finance readers", "Support" ], alice_permissions ], response.parsed_body.values_at("home_roles", "home_permissions")
   end
 
   test "* is passed through as is" do
     grant_dashboard(users(:mwi), "Administrators")
     tokens = oidc_login(users(:mwi), @client, secret: @secret)
-    claims = verify_id_token(tokens["id_token"], aud: "dashboard-web")
-    assert_equal [ "Administrators" ], claims["dashboard_roles"]
-    assert_equal [ "*" ], claims["dashboard_permissions"]
+    claims = verify_id_token(tokens["id_token"], aud: "home-web")
+    assert_equal [ "Administrators" ], claims["home_roles"]
+    assert_equal [ "*" ], claims["home_permissions"]
   end
 
   test "the claims never replace a standard claim" do
     @dash.update_columns(role_claim: "email")
     tokens = oidc_login(users(:alice), @client, secret: @secret)
-    claims = verify_id_token(tokens["id_token"], aud: "dashboard-web")
+    claims = verify_id_token(tokens["id_token"], aud: "home-web")
     assert_equal "alice@tourpaq.com", claims["email"]
-    assert_equal alice_permissions, claims["dashboard_permissions"]
+    assert_equal alice_permissions, claims["home_permissions"]
   end
 
   test "no roles means no access at authorize" do
@@ -79,10 +79,10 @@ class Api::PermissionAppsTest < ActionDispatch::IntegrationTest
 
   test "introspection: roles, permissions and the token's scope from the app's list" do
     token = PersonalToken.issue!(user: users(:alice), app: @dash, name: "Paperclip", scope: "all")
-    answer = introspect(token, client_id: "dashboard-web", secret: @secret)
+    answer = introspect(token, client_id: "home-web", secret: @secret)
     assert_equal [ true, "all", nil, [ "Finance readers", "Support" ], alice_permissions ],
                  answer.values_at("active", "scope", "role", "roles", "permissions")
-    assert token.start_with?("tpa_dashboard_")
+    assert token.start_with?("tpa_home_")
 
     irm_token = PersonalToken.issue!(user: users(:alice), app: apps(:irm), name: "IRM", scope: "read_write")
     answer = introspect(irm_token, secret: secret_for(clients(:irm_web)))
@@ -94,7 +94,7 @@ class Api::PermissionAppsTest < ActionDispatch::IntegrationTest
     extension = Client.create!(app: @dash, client_id: "dashboard-extension", kind: "extension", name: "Dashboard extension",
                                redirect_uris: [ OidcHelpers::EXTENSION_REDIRECT ])
     tokens = oidc_login(users(:alice), extension, scope: "openid offline_access")
-    answer = introspect(tokens["access_token"], client_id: "dashboard-web", secret: @secret)
+    answer = introspect(tokens["access_token"], client_id: "home-web", secret: @secret)
     assert_equal [ true, "extension", "all" ], answer.values_at("active", "token_type", "scope")
   end
 
@@ -105,7 +105,7 @@ class Api::PermissionAppsTest < ActionDispatch::IntegrationTest
     put "/api/v1/catalogue", params: body.to_json, headers: @auth.merge("Content-Type" => "application/json")
     assert_response :success
     answer = response.parsed_body
-    assert_equal [ "dashboard", 2, [ "module:invoices:view" ] ], answer.values_at("app", "count", "added")
+    assert_equal [ "home", 2, [ "module:invoices:view" ] ], answer.values_at("app", "count", "added")
     assert_includes answer["removed"], "module:tasks:view"
     assert_includes answer["unknown"], { "role" => "Support", "permissions" => [ "module:tasks:view" ] }
     assert_equal %w[module:customers:view module:invoices:view], @dash.reload.catalogue_keys

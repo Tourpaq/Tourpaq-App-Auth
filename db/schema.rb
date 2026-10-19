@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_10_17_150001) do
+ActiveRecord::Schema[8.1].define(version: 2026_10_19_080001) do
   create_table "app_permissions", force: :cascade do |t|
     t.integer "app_id", null: false
     t.string "key", null: false

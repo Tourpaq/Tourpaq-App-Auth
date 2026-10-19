@@ -10,7 +10,7 @@
 #                                     Dashboard's permission catalogue, and wait until everything answers
 #   bin/dev-stack down                stop the containers bin/dev-stack started (stack-auth, stack-irm, …)
 #   bin/dev-stack status              which stack containers run, with their URLs
-#   bin/dev-stack logs <name>         follow one container's log (auth, irm, kpi, logs, azure-cost, dashboard)
+#   bin/dev-stack logs <name>         follow one container's log (auth, irm, kpi, logs, azure-cost, home)
 #   bin/dev-stack dashboard-import    (again) put sample pre-cutover access data into the Dashboard's stack database,
 #                                     export it with the Dashboard's own export, import it here (dry run, APPLY=1)
 #                                     and run the Dashboard's auth:verify_import (needs the auth app running)
@@ -42,7 +42,7 @@ ENV_NAME=".env.auth-local"
 STATE_DIR="$AUTH_DIR/tmp/dev-stack"
 ISSUER="http://auth.localhost:3050"
 INTERNAL_URL="http://host.docker.internal:3050"
-ALL_APPS="irm kpi logs azure-cost dashboard"
+ALL_APPS="irm kpi logs azure-cost home"
 APPS="${STACK_APPS:-$ALL_APPS}"
 CACHE_SECONDS="${STACK_ACCESS_CACHE_SECONDS:-30}"
 
@@ -54,7 +54,7 @@ app_dir() {
     kpi) echo "$CODE_DIR/Tourpaq-App-KPI" ;;
     logs) echo "$CODE_DIR/Tourpaq-App-Logs-Analyzer" ;;
     azure-cost) echo "$CODE_DIR/Tourpaq-App-Azure-Cost" ;;
-    dashboard) echo "$CODE_DIR/Tourpaq-App-Dashboard" ;;
+    home) echo "$CODE_DIR/Tourpaq-App-Home" ;;
     *) echo "unknown app $1 (one of: $ALL_APPS)" >&2; exit 64 ;;
   esac
 }
@@ -63,7 +63,7 @@ app_client() { echo "$1-web"; }
 
 # The port inside the container (each app's dev port, which its bin/docker-dev publishes).
 app_inner_port() {
-  case "$1" in irm) echo 3030 ;; kpi) echo 3040 ;; logs) echo 3020 ;; azure-cost) echo 3010 ;; dashboard) echo 4013 ;; esac
+  case "$1" in irm) echo 3030 ;; kpi) echo 3040 ;; logs) echo 3020 ;; azure-cost) echo 3010 ;; home) echo 4013 ;; esac
 }
 
 # The port on this machine (WEB_PORT of bin/docker-dev).
@@ -73,12 +73,12 @@ app_port() {
     kpi) echo "${KPI_PORT:-3040}" ;;
     logs) echo "${LOGS_PORT:-3020}" ;;
     azure-cost) echo "${AZURE_COST_PORT:-3010}" ;;
-    dashboard) echo "${DASHBOARD_PORT:-4013}" ;;
+    home) echo "${HOME_PORT:-${DASHBOARD_PORT:-4013}}" ;;
   esac
 }
 
 app_title() {
-  case "$1" in irm) echo "IRM" ;; kpi) echo "KPI" ;; logs) echo "Logs Analyzer" ;; azure-cost) echo "Azure Cost" ;; dashboard) echo "Dashboard" ;; esac
+  case "$1" in irm) echo "IRM" ;; kpi) echo "KPI" ;; logs) echo "Logs Analyzer" ;; azure-cost) echo "Azure Cost" ;; home) echo "Home" ;; esac
 }
 
 container() { echo "stack-$1"; }
@@ -164,7 +164,7 @@ write_app_env() { # $1 = app, $2 = secret
         say "DATA_DIR=/rails/storage/stack_data" ;;
       azure-cost)
         say "DATABASE_URL=sqlite3:storage/stack.sqlite3" ;;
-      dashboard)
+      home)
         say "DATABASE_URL=sqlite3:storage/stack.sqlite3"
         say "# The temporary Entra hop (the auth app's SPECS.md §24.2) forwards to the local auth app."
         say "AUTH_ENTRA_CALLBACK_URL=$ISSUER/auth/entra_id/callback"
@@ -222,7 +222,7 @@ ARGV.each do |spec|
   secret = out.string[/^LOGIN_CLIENT_SECRET=(\S+)$/, 1] or abort("dev-stack: auth:client_secret printed no secret for #{client_id}")
   puts "SECRET #{client_id} #{secret}"
 end
-dashboard = App.find_by(slug: "dashboard")
+dashboard = App.find_by(slug: "home")
 puts "DASHBOARD_ROLES #{dashboard ? dashboard.roles.count : 0}"
 '
 
@@ -334,10 +334,10 @@ up() {
   wait_for auth "http://127.0.0.1:3050/up"
   local name
   case " $APPS " in
-    *" dashboard "*)
+    *" home "*)
       if [ "$DASHBOARD_ROLES" = "0" ]; then dashboard_import; fi
       step "Dashboard: pushing its permission catalogue"
-      in_repo "$(app_dir dashboard)" bin/rails auth:push_catalogue 2>&1 | grep -E 'Pushed|^Role |not pushed|not configured' || true ;;
+      in_repo "$(app_dir home)" bin/rails auth:push_catalogue 2>&1 | grep -E 'Pushed|^Role |not pushed|not configured' || true ;;
   esac
   for name in $APPS; do start_one "$name"; done
   for name in $APPS; do wait_for "$name" "http://localhost:$(app_port "$name")/up"; done
@@ -433,7 +433,7 @@ puts "Sample access data: #{groups.count} groups, #{users.count} people, #{membe
 '
 
 dashboard_import() {
-  local dir; dir="$(app_dir dashboard)"
+  local dir; dir="$(app_dir home)"
   step "Dashboard: sample pre-cutover access data, its export, the import here (SPECS.md §23.5)"
   in_repo "$dir" bin/rails runner "$DASHBOARD_SAMPLE_RUBY" 2>/dev/null
   in_repo "$dir" env OUT=tmp/stack-dashboard-export.json bin/rails auth:export 2>&1 | grep -E '^(Wrote|Note)' || true
@@ -480,7 +480,7 @@ case "${1:-prepare}" in
   up) shift; up "$@" ;;
   down) down ;;
   status) status ;;
-  logs) [ -n "${2:-}" ] || die "usage: bin/dev-stack logs <auth|irm|kpi|logs|azure-cost|dashboard>"; docker logs -f "$(container "$2")" ;;
+  logs) [ -n "${2:-}" ] || die "usage: bin/dev-stack logs <auth|irm|kpi|logs|azure-cost|home>"; docker logs -f "$(container "$2")" ;;
   dashboard-import) check_docker; dashboard_import ;;
   reset) reset ;;
   -h|--help|help) sed -n '2,/^set -euo/p' "$0" | sed '$d' | sed 's/^# \{0,1\}//' ;;

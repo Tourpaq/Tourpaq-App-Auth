@@ -7,7 +7,7 @@ class Index::ImportTest < ActiveSupport::TestCase
 
   setup do
     @json = FILE.read
-    @dashboard = App.create!(slug: "dashboard", name: "Dashboard", url: "https://home.app.journeybooking.eu", multiple_roles: true)
+    @dashboard = App.create!(slug: "home", name: "Dashboard", url: "https://home.app.journeybooking.eu", multiple_roles: true)
   end
 
   def empty_index!

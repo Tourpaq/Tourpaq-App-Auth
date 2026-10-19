@@ -1375,7 +1375,16 @@ line with it.
 | **auth.app.journeybooking.eu** | Entra sign-in, the OIDC provider (issuer `https://auth.app.journeybooking.eu`), the authorization API, introspection, catalogue push, the "waiting for access" and "no access" pages | **The issuer. Permanent.** `/` sends a signed-in user to index.app. No other issuer name is used anywhere |
 | **index.app.journeybooking.eu** | The index (§24.3): the apps a user has access to plus links and services, docs, search; the profile; personal tokens; the index API for the extension | Replaces Tourpaq-App-WWW (www.app.journeybooking.eu) and the launcher of the earlier design |
 | **admin.app.journeybooking.eu** | Administration: users, groups, roles, apps, clients, **and the index content** (sections, entries, links, docs, vocabularies) | As §11.2 |
-| home.app.journeybooking.eu | **The Dashboard stays here.** It does not move to another host | An ordinary OIDC client of auth.app |
+| home.app.journeybooking.eu | **Home (formerly the Dashboard) stays here.** It does not move to another host | An ordinary OIDC client of auth.app |
+
+- **The Dashboard is now called Home** (decided 19 October 2026; its repository is `../Tourpaq-App-Home`). In the auth
+  app it is the app `home`: client `home-web`, claims `home_roles` / `home_permissions`, new tokens `tpa_home_…`.
+  §23 and the import (`auth:import_dashboard`, the `tourpaq-dashboard-export` format) keep the old name in prose and
+  in their contract. *Built:* the seeds create the app as `home`; the migration `RenameDashboardAppToHome` turns an
+  existing `dashboard` app into `home` before the seeds run (slug, the role claim if it was the default, the name if
+  it was "Dashboard"; roles, grants, catalogue, clients and tokens kept; audited `app.renamed`). Tokens issued as
+  `tpa_dashboard_…` keep working: a token is found by its digest, and Home accepts both prefixes. An old
+  `dashboard-web` client is left as it is (disable or delete it in admin.app).
 
 - **Everything is behind NetBird.** Mogens controls the NetBird config per host. "Public" in earlier sections means
   "reachable to everyone on NetBird". Customers and contracted developers who need access have NetBird.

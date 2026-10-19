@@ -1,6 +1,6 @@
 # Ready-made roles for a multiple-roles app (SPECS.md §23.2), so its roles are one click on the app page instead of
 # somebody working out permission keys. The sets are defined here per app slug; an app without a definition gets no
-# button.
+# button. Home is the former Dashboard (slug "home" since 19 October 2026).
 #
 #   StarterRoles.for(app)        # [StarterRoles::Role] with the permissions the app's catalogue knows
 #   StarterRoles.missing(app)    # those the app does not have yet (by name, without regard to case)
@@ -18,7 +18,7 @@ class StarterRoles
   ADMIN_GROUP = "DK Tech".freeze
 
   DEFINITIONS = {
-    "dashboard" => [
+    "home" => [
       Role.new(key: "Admin", description: "Everything, including Administration and the confidential figures",
                permissions: [ AppRole::WILDCARD ]),
       Role.new(key: "Management", description: "Staff, plus Management, release notes and the financial figures",

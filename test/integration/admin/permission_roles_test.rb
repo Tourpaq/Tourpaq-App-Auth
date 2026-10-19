@@ -34,7 +34,7 @@ class Admin::PermissionRolesTest < ActionDispatch::IntegrationTest
     assert_select ".pill-bad", "1 unknown"
     assert_select ".pill-warn", "everything (*)"
     assert_select "summary", "5 permissions in 3 groups"
-    assert_select "dd.mono", "dashboard_permissions"
+    assert_select "dd.mono", "home_permissions"
     assert_select "dd.mono", "public < all"
     assert_select "a", text: "Higher", count: 0
 
@@ -170,7 +170,7 @@ class Admin::PermissionRolesTest < ActionDispatch::IntegrationTest
     get "/access.csv"
     lines = response.body.split("\r\n")
     header = lines.first.split(",")
-    assert_includes header, "dashboard permissions"
+    assert_includes header, "home permissions"
     alice = lines.detect { _1.start_with?("alice@tourpaq.com") }
     assert_includes alice, "Finance readers; Support"
     assert_includes alice, "Finance readers: RO Dev; Support: direct"
@@ -206,7 +206,7 @@ class PermissionAppHomeTest < ActionDispatch::IntegrationTest
     assert_response :success
     token = PersonalToken.find_by_plain(css_select(".link-box code").text)
     assert_equal [ @dash, "all" ], [ token.app, token.scope ]
-    assert token.token_hint.start_with?("tpa_dashboard_")
+    assert token.token_hint.start_with?("tpa_home_")
 
     post "/tokens", params: { personal_token: { app_id: @dash.id, name: "Wrong", scope: "read_write", lifetime_days: 90 } }
     assert_response :unprocessable_content

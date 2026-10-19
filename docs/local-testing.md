@@ -17,7 +17,7 @@ checking Postgres is CI's job.
 
 - Docker Desktop running.
 - The repositories side by side in one folder (`~/code/Tourpaq-App-Auth`, `Tourpaq-App-IRM`, `Tourpaq-App-KPI`,
-  `Tourpaq-App-Logs-Analyzer`, `Tourpaq-App-Azure-Cost`, `Tourpaq-App-Dashboard`). If they are somewhere else, set
+  `Tourpaq-App-Logs-Analyzer`, `Tourpaq-App-Azure-Cost`, `Tourpaq-App-Home`). If they are somewhere else, set
   `CODE_DIR=/path`.
 - Each app's `bin/docker-dev` must understand `ENV_FILE=.env.auth-local` and `DOCKER_NAME` (all five do now). It
   falls back to `.env` when `ENV_FILE` is not set, as before. It publishes its port only for the server (no
@@ -48,7 +48,7 @@ Preparing (both commands do this):
    The script then runs `db:prepare` (create, migrate, seed). The seeds bring the DK Tech admins, the apps, their
    clients and the index content.
 2. **Client secrets** are created with `bin/rails "auth:client_secret[<client>]"` for `irm-web`, `kpi-web`,
-   `logs-web`, `azure-cost-web` and `dashboard-web`. Each one is audited as `client.secret_created`.
+   `logs-web`, `azure-cost-web` and `home-web`. Each one is audited as `client.secret_created`.
    - When you run the script again, it keeps a secret that is still valid. It compares the SHA-256, so the secret
      itself is never sent anywhere.
    - When a client already holds two secrets, the script deletes the oldest one (audited as
@@ -88,7 +88,7 @@ Starting (`up` only):
    You can run this again with `bin/dev-stack dashboard-import`. A second apply is refused because the import was
    already applied, which is the import's rule.
 3. The script pushes the Dashboard's permission catalogue (`bin/rails auth:push_catalogue`).
-4. The apps start as `stack-irm`, `stack-kpi`, `stack-logs`, `stack-azure-cost` and `stack-dashboard`. Their logs
+4. The apps start as `stack-irm`, `stack-kpi`, `stack-logs`, `stack-azure-cost` and `stack-home`. Their logs
    go to `tmp/dev-stack/<name>.log`. The script waits until each one answers `/up`.
 
 Once the apps' Docker images and gems are built (the first `bin/docker-dev` in each repository builds them), `up`
@@ -104,7 +104,7 @@ cd ~/code/Tourpaq-App-IRM            && ENV_FILE=.env.auth-local WEB_PORT=3030 b
 cd ~/code/Tourpaq-App-KPI            && ENV_FILE=.env.auth-local WEB_PORT=3040 bin/docker-dev bin/rails server -b 0.0.0.0 -p 3040 -P tmp/pids/stack-server.pid
 cd ~/code/Tourpaq-App-Logs-Analyzer  && ENV_FILE=.env.auth-local WEB_PORT=3020 bin/docker-dev bin/rails server -b 0.0.0.0 -p 3020 -P tmp/pids/stack-server.pid
 cd ~/code/Tourpaq-App-Azure-Cost     && ENV_FILE=.env.auth-local WEB_PORT=3010 bin/docker-dev bin/rails server -b 0.0.0.0 -p 3010 -P tmp/pids/stack-server.pid
-cd ~/code/Tourpaq-App-Dashboard      && ENV_FILE=.env.auth-local WEB_PORT=4013 bin/docker-dev bin/rails server -b 0.0.0.0 -p 4013 -P tmp/pids/stack-server.pid
+cd ~/code/Tourpaq-App-Home      && ENV_FILE=.env.auth-local WEB_PORT=4013 bin/docker-dev bin/rails server -b 0.0.0.0 -p 4013 -P tmp/pids/stack-server.pid
 ```
 
 The `-P tmp/pids/stack-server.pid` lets a stack server run next to your own dev server's pid file. The Dashboard's
@@ -112,7 +112,7 @@ sample import and catalogue push happen only with `up`. By hand, run `bin/dev-st
 app is running, then:
 
 ```sh
-cd ~/code/Tourpaq-App-Dashboard && ENV_FILE=.env.auth-local bin/docker-dev bin/rails auth:push_catalogue
+cd ~/code/Tourpaq-App-Home && ENV_FILE=.env.auth-local bin/docker-dev bin/rails auth:push_catalogue
 ```
 
 ## URLs

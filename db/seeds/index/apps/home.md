@@ -1,8 +1,8 @@
 ---
-name: Tourpaq Dashboard
+name: Tourpaq Home
 description: Tourpaq's internal control center
 url: https://home.app.journeybooking.eu
-app: dashboard
+app: home
 category: Apps
 status: internal
 access: netbird

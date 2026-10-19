@@ -62,7 +62,7 @@ class App < ApplicationRecord
   scope :in_launcher, -> { active.where(show_in_launcher: true) }
 
   # "<slug>_role" with dashes as underscores: irm_role, kpi_role, azure_cost_role. A multiple-roles app's
-  # claim holds a list: "<slug>_roles" (dashboard_roles).
+  # claim holds a list: "<slug>_roles" (home_roles).
   def self.default_role_claim(slug, multiple: false) = "#{slug.to_s.tr('-', '_')}_#{multiple ? 'roles' : 'role'}"
 
   def active? = disabled_at.nil?
