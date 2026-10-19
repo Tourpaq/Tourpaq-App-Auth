@@ -1174,6 +1174,15 @@ An app gains three optional settings:
 - **The role editor** (`/apps/:app_id/roles/:id/edit`): description; "Everything (*)"; the catalogue as checkboxes in
   one fieldset per group label, in the app's order; the unknown keys; a text box for other keys. Saving is audited
   `app.role_changed` with the keys added and removed.
+- **How access works, and standard roles** (`StarterRoles`, `Admin::AppRolesController#starter`): a multiple-roles
+  app's page opens with a three-step box (roles are made once; groups are given roles; people are added to groups,
+  the everyday task). For an app with a definition in `StarterRoles::DEFINITIONS` (the Dashboard: Admin `*`,
+  Management, Staff), a "Standard roles" card lists the ones it does not have yet (by name, without regard to case)
+  with their permissions by catalogue label, and one button creates them (`POST /apps/:app_id/roles/starter`, each
+  audited `app.role_added` with `via: "starter_roles"`). Keys the pushed catalogue does not know are left out, so a
+  starter role is never born with unknown permissions. Existing roles are never changed. While the admin role is
+  among the missing, a ticked-by-default box also gives the group DK Tech that role (`GrantChange.add`, audited
+  `grant.created`); a refused grant leaves the roles and says why.
 - **The last-administrator guard** (`AppAdminGuard.protect`) applies to an active multiple-roles app with an admin
   permission. It refuses a change only when somebody active held the permission before and nobody does after, so an
   app nobody administers yet (the Dashboard before its import) is not blocked. It covers removing or replacing a grant

@@ -22,6 +22,8 @@ class Admin::AppsController < Admin::BaseController
     @roles_in_use = Grant.where(app_role_id: @app.roles.map(&:id)).group(:app_role_id).count
     @unknown = @app.unknown_permissions
     @catalogue_groups = @app.catalogue.group_by(&:display_group)
+    @starter_roles = StarterRoles.missing(@app)
+    @starter_admin_group = Group.find_by(name: StarterRoles::ADMIN_GROUP) if @starter_roles.include?(StarterRoles.admin_role(@app))
   end
 
   def members

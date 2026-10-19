@@ -41,6 +41,7 @@ constraints(AuthHosts::Admin) do
         collection do
           get :reorder               # preview: whose effective role changes
           patch :reorder, action: :apply_reorder
+          post :starter              # the app's ready-made roles (StarterRoles), optionally admin for DK Tech
         end
       end
       resources :clients, only: %i[show new create edit update] do

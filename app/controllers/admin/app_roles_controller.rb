@@ -5,6 +5,8 @@
 # In a multiple-roles app (§23.2) a role is a permission set: the role editor (edit) shows the app's pushed
 # catalogue as checkboxes grouped by group label, "*" for everything, and keys the catalogue does not know in red
 # (kept until unticked). Saving goes through the per-app last-administrator guard (AppAdminGuard).
+# `starter` adds the app's ready-made roles (StarterRoles) that it does not have yet, and with admin_group=1 gives
+# DK Tech the admin one.
 class Admin::AppRolesController < Admin::BaseController
   before_action :set_app
 
@@ -22,6 +24,20 @@ class Admin::AppRolesController < Admin::BaseController
       @app.roles.reset
       refused(role, to: admin_app_path(@app))
     end
+  end
+
+  # POST: the starter roles the app does not have yet; existing roles are never touched.
+  def starter
+    return refused("#{@app.name} has no standard roles.", to: admin_app_path(@app)) if StarterRoles.for(@app).empty?
+    group = Group.find_by(name: StarterRoles::ADMIN_GROUP) if params[:admin_group] == "1"
+    result = StarterRoles.create!(@app, admin_group: group)
+    if result.grant&.errors&.any?
+      return refused("The roles are added, but #{group.name} could not be given #{StarterRoles.admin_role(@app).key}: " \
+                     "#{result.grant.errors.full_messages.to_sentence}", to: admin_app_path(@app))
+    end
+    notice = result.created.any? ? "Added #{result.created.map(&:key).to_sentence}." : "#{@app.name} already has the standard roles."
+    notice += " #{group.name} now has #{StarterRoles.admin_role(@app).key}." if result.grant
+    redirect_to admin_app_path(@app), notice: notice
   end
 
   # The role editor (multiple-roles apps: description and permissions).

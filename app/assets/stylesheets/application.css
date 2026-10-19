@@ -228,6 +228,12 @@ tr.row-pending td:first-child { box-shadow:inset 3px 0 0 #bf8700; }
 .inline-form select, .inline-form input[type=text] { padding:4px 8px; font-size:13px; }
 .inline-label { display:inline; margin:0 4px 0 0; font-size:13px; }
 .add-member, .add-role { margin:10px 0 16px; }
+.how-access ol { margin:0 0 8px; padding-left:20px; }
+.how-access li { margin:4px 0; }
+.starter-list { list-style:none; margin:8px 0 12px; padding:0; }
+.starter-list li { padding:8px 0; border-top:1px solid var(--border); }
+.starter-list li:first-child { border-top:none; }
+.starter-form { display:flex; flex-direction:column; align-items:flex-start; gap:10px; }
 .wide-input { min-width:220px; flex:1; }
 .narrow-form { max-width:520px; }
 .save-order { margin-top:16px; }

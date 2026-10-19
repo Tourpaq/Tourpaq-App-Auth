@@ -43,6 +43,51 @@
 <% end %>
 
 <% if @app.multiple_roles? %>
+<div class="card how-access">
+  <h2>How access to <%= @app.name %> works</h2>
+  <ol>
+    <li><strong>Roles</strong> (below) are sets of <%= @app.name %> permissions. They are made once<%= ", with the standard roles as a start" if StarterRoles.for(@app).any? %>.</li>
+    <li><strong>Groups</strong> are given roles: <%= link_to "Groups", admin_groups_path %> → the group → <%= @app.name %> → Add.</li>
+    <li><strong>People</strong> are added to a group and get everything its roles give, at their next sign-in or within a few
+      minutes. Somebody who has not signed in yet can be added first under <%= link_to "Users → New user", new_admin_user_path %>.</li>
+  </ol>
+  <p class="muted small">So the everyday task is step 3: add the person to the right group. A person may be in several groups
+    and gets the union; a direct "no access" on their user page overrides them all.</p>
+</div>
+
+<% if @starter_roles.any? %>
+  <% labels = @app.catalogue.to_h { [ _1.key, _1.display_label ] } %>
+  <div class="card starter-roles">
+    <h2>Standard roles</h2>
+    <p class="muted small"><%= @app.name %> <%= @app.roles.empty? ? "has no roles yet" : "does not have these yet" %>. These are
+      ready to use; each can be changed afterwards like any other role. Existing roles are not touched.</p>
+    <ul class="starter-list">
+      <% @starter_roles.each do |role| %>
+        <li>
+          <strong><%= role.key %></strong> <span class="muted">— <%= role.description %></span>
+          <div class="small">
+            <% if role.permissions.include?(AppRole::WILDCARD) %>
+              <span class="pill pill-warn">everything (*)</span>
+            <% else %>
+              <%= safe_join(role.permissions.map { labels[_1] || tag.code(_1) }, ", ") %>
+            <% end %>
+          </div>
+        </li>
+      <% end %>
+    </ul>
+    <%= form_with url: starter_admin_app_roles_path(@app), class: "starter-form" do |f| %>
+      <% if @starter_admin_group %>
+        <label class="check">
+          <%= check_box_tag :admin_group, "1", true, id: "starter_admin_group" %>
+          Give the group <%= link_to @starter_admin_group.name, admin_group_path(@starter_admin_group) %> the
+          <%= StarterRoles.admin_role(@app).key %> role (<%= pluralize(@starter_admin_group.users.count, "member") %>)
+        </label>
+      <% end %>
+      <%= f.submit "Create #{@starter_roles.size == 1 ? 'this role' : 'these roles'}" %>
+    <% end %>
+  </div>
+<% end %>
+
 <h2>Roles</h2>
 <p class="muted small">Each role is a set of permissions. A user may hold several, directly and through groups, and gets the
   union; a direct "no access" overrides them all. Order does not matter.</p>
@@ -74,7 +119,7 @@
         </tr>
       <% end %>
       <% if @app.roles.empty? %>
-        <tr><td colspan="5" class="empty">No roles yet.</td></tr>
+        <tr><td colspan="5" class="empty">No roles yet<%= ": use the standard roles above, or add your own" if @starter_roles.any? %>.</td></tr>
       <% end %>
     </tbody>
   </table>
