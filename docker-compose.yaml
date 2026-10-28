@@ -59,7 +59,7 @@ services:
       # last completed Entra sign-in (SPECS.md §3.1).
       ENTRA_REQUIRE_AUTH_TIME: "${ENTRA_REQUIRE_AUTH_TIME:-false}"
       # --- OIDC provider signing keys (SPECS.md §7.3, §14): RSA PEM ---
-      OIDC_SIGNING_KEY: "${OIDC_SIGNING_KEY:-}"
+      # OIDC_SIGNING_KEY: "${OIDC_SIGNING_KEY:-}"
       OIDC_PREVIOUS_SIGNING_KEY: "${OIDC_PREVIOUS_SIGNING_KEY:-}"
       # --- Sessions (SPECS.md §3.3, §11.2) ---
       SESSION_IDLE_HOURS: "${SESSION_IDLE_HOURS:-8}"
