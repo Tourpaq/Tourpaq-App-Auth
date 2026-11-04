@@ -18,8 +18,18 @@
 #
 # Token scopes (§23.3): app.token_scopes is the ordered list, lowest first (default read < read_write);
 # app.highest_token_scope is what an extension token gets.
+#
+# Channels (§25): an app is reached on the web (sign-in, ID token, access API, its own personal tokens), through the
+# MCP Gateway, or both; each grant is for one channel and the effective role is worked out per channel.
+#
+#   app.channels             # ["web", "mcp"]
+#   app.channel?("mcp")
+#   app.gateway?             # the MCP Gateway app itself: MCP only, access derived from MCP roles elsewhere
+#   app.token_channel        # whose role a personal token of this app follows: "mcp" for a gateway, else "web"
 class App < ApplicationRecord
   DEFAULT_TOKEN_SCOPES = %w[read read_write].freeze
+  CHANNELS = %w[web mcp].freeze
+  CHANNEL_LABELS = { "web" => "Web", "mcp" => "MCP" }.freeze
   SCOPE_FORMAT = /\A[a-z][a-z0-9_]*\z/
 
   has_many :roles, -> { order(:position) }, class_name: "AppRole", inverse_of: :app, dependent: :destroy
@@ -27,6 +37,7 @@ class App < ApplicationRecord
   has_many :clients, dependent: :restrict_with_error
   has_many :grants, dependent: :destroy
   has_many :personal_tokens, dependent: :restrict_with_error
+  has_many :exchanged_tokens, dependent: :delete_all
 
   SLUG_FORMAT = /\A[a-z0-9]+(-[a-z0-9]+)*\z/
   # Claims the ID token, userinfo or JWT already define: a role claim with one of these names would replace
@@ -56,10 +67,14 @@ class App < ApplicationRecord
   validate :permissions_claim_is_free
   validate :token_scopes_are_valid
   validate :single_role_switch_is_safe, on: :update
+  validate :channels_are_valid
 
   scope :ordered, -> { order(:name) }
   scope :active, -> { where(disabled_at: nil) }
   scope :in_launcher, -> { active.where(show_in_launcher: true) }
+  scope :with_channel, ->(channel) { channel.to_s == "mcp" ? where(mcp_channel: true) : where(web_channel: true) }
+  scope :gateways, -> { where(gateway: true) }
+  scope :mcp_backends, -> { where(mcp_channel: true, gateway: false) }
 
   # "<slug>_role" with dashes as underscores: irm_role, kpi_role, azure_cost_role. A multiple-roles app's
   # claim holds a list: "<slug>_roles" (home_roles).
@@ -67,6 +82,14 @@ class App < ApplicationRecord
 
   def active? = disabled_at.nil?
   def disabled? = !active?
+
+  # --- Channels (§25) ------------------------------------------------------------------------------
+
+  def self.channel_label(channel) = CHANNEL_LABELS.fetch(channel.to_s, channel.to_s)
+
+  def channels = CHANNELS.select { channel?(_1) }
+  def channel?(channel) = channel.to_s == "mcp" ? mcp_channel? : (channel.to_s == "web" && web_channel?)
+  def token_channel = gateway? ? "mcp" : "web"
 
   def role_keys = roles.map(&:key)
   def role(key) = multiple_roles? ? roles.detect { _1.key.casecmp?(key.to_s) } : roles.detect { _1.key == key.to_s }
@@ -151,6 +174,14 @@ class App < ApplicationRecord
     return if new_record? || !will_save_change_to_token_scopes?
     in_use = personal_tokens.active.where.not(scope: scopes).distinct.pluck(:scope)
     errors.add(:token_scopes, "still in use by active tokens: #{in_use.sort.join(', ')}") if in_use.any?
+  end
+
+  # At least one channel; the gateway is reached only through MCP and has one role-holding way in (its own).
+  def channels_are_valid
+    errors.add(:base, "An app needs the web channel, the MCP channel or both") unless web_channel? || mcp_channel?
+    return unless gateway?
+    errors.add(:gateway, "is reached through MCP only: turn the web channel off and the MCP channel on") if web_channel? || !mcp_channel?
+    errors.add(:gateway, "cannot have multiple roles") if multiple_roles?
   end
 
   # Turning multiple roles off is refused while somebody holds several roles, or a role name is not a plain key.

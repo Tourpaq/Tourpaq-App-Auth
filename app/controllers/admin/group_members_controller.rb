@@ -33,7 +33,7 @@ class Admin::GroupMembersController < Admin::BaseController
   def change(action, user, &block)
     apps = App.where(id: @group.grants.select(:app_id)).to_a
     GroupMembership.transaction do
-      entries = AccessChange.track(users: [ user ], apps: apps) { AppAdminGuard.protect(apps, &block) }
+      entries = AccessChange.track(users: [ user ], apps: apps, channels: App::CHANNELS) { AppAdminGuard.protect(apps, &block) }
       AuditEvent.record(action, subject: @group,
                         data: { user_id: user.id, email: user.email, access: AccessChange.audit_data(entries.select(&:changed?), with_app: true) })
     end

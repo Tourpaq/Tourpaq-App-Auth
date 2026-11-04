@@ -29,6 +29,12 @@ module ApplicationHelper
     tag.time(text, datetime: time.utc.iso8601, title: time.in_time_zone(viewer_time_zone).strftime("%-d %b %Y %H:%M %Z"))
   end
 
+  # "Web" / "MCP" (SPECS.md §25) as a small pill.
+  def channel_pill(channel) = tag.span(App.channel_label(channel), class: "pill pill-muted channel-#{channel}")
+
+  # The app's channels as pills: "Web MCP".
+  def channel_pills(app) = safe_join(app.channels.map { channel_pill(_1) }, " ")
+
   # A role key (or AppRole, or EffectiveRole result) as a badge; "no access" when nil. A multiple-roles
   # result (SPECS.md §23.2) is one badge per held role.
   def role_badge(role)

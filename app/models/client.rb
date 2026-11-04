@@ -23,6 +23,7 @@ class Client < ApplicationRecord
   has_many :authorization_codes, dependent: :delete_all
   has_many :oauth_tokens, dependent: :destroy
   has_many :usage_counts, dependent: :delete_all
+  has_many :exchanged_tokens, dependent: :delete_all
 
   normalizes :client_id, with: ->(id) { id.to_s.strip.downcase }
   attr_readonly :client_id

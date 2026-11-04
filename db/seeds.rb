@@ -1,5 +1,5 @@
-# The starting point (SPECS.md §1, §5.1, §5.2, §23, §24): the DK Tech admins, three staff groups, the apps we know
-# with their roles, DK Tech as admin in every app that has an "admin" role, the apps' clients, and the internal
+# The starting point (SPECS.md §1, §5.1, §5.2, §23, §24, §25): the DK Tech admins, three staff groups, the apps we know
+# with their roles and channels (the MCP Gateway and the data sources behind it among them), DK Tech as admin in every app that has an "admin" role, the apps' clients, and the internal
 # clients of the index and admin hosts. Home, formerly the Dashboard (at home.app, §24.1), is registered with
 # multiple roles and no roles yet (its standard roles or its import create them, §23.2, §23.5).
 #
@@ -38,10 +38,10 @@ apps = [
              [ "editor", "Configures integrations, escalations and schedules" ], [ "admin", "Manages users and settings" ] ],
     extension: true, extension_ids: [ "fejfbgidhcpfhogplgbomjcacgljdjch" ] }, # fixed by the IRM manifest's "key" (§10)
   { slug: "kpi", name: "KPI", description: "Business key figures and reports.",
-    icon: "chart", url: "https://kpi.app.journeybooking.eu", dev_port: 3040,
+    icon: "chart", url: "https://kpi.app.journeybooking.eu", dev_port: 3040, mcp: true,
     roles: [ [ "viewer", "Sees the reports" ], [ "editor", "Edits reports and targets" ], [ "admin", "Manages the app" ] ] },
   { slug: "logs", name: "Logs Analyzer", description: "Search and analyse application logs.",
-    icon: "logs", url: "https://logs.app.journeybooking.eu", dev_port: 3020,
+    icon: "logs", url: "https://logs.app.journeybooking.eu", dev_port: 3020, mcp: true,
     roles: [ [ "viewer", "Reads every page, the MCP read tools and the API" ],
              [ "admin", "Changes settings, ingestion, findings and analyses" ] ] },
   # The host is azurecost.app (no dash), where the app already runs and the index links to; the slug (and so the
@@ -64,33 +64,55 @@ apps = [
   { slug: "home", name: "Home", description: "Customers, management figures, tasks and the team's daily tools.",
     icon: "home", url: "https://home.app.journeybooking.eu", dev_port: 4013,
     multiple_roles: true, role_claim: "home_roles", admin_permission: "admin:access:manage", token_scopes: %w[public all],
-    roles: [], post_logout: [ "https://home.app.journeybooking.eu/" ] }
+    roles: [], post_logout: [ "https://home.app.journeybooking.eu/" ] },
+  # The Offers Validator (Bravo offers in Elastic / EO2); its MCP server is reached through the MCP Gateway.
+  { slug: "offers-validator", name: "Offers Validator", description: "Whether every Bravo offer for sale is in Elastic and EO2.",
+    icon: "logs", url: "https://offers.app.journeybooking.eu", dev_port: 3060, mcp: true,
+    roles: [ [ "viewer", "Reads every page and the MCP tools" ], [ "admin", "Runs live checks, syncs and resets" ] ] },
+  # The MCP Gateway (SPECS.md §25): one MCP endpoint and one personal token (tpa_mcp_…) for every MCP tool a person has.
+  # MCP only; its access follows the MCP access to the apps behind it. Its client mcp-web has no redirect URI: it only
+  # introspects gateway tokens and exchanges them (§25.5).
+  { slug: "mcp", name: "MCP Gateway", description: "One MCP endpoint and one token for Claude: every MCP tool you have access to.",
+    icon: "logs", url: "https://mcp.app.journeybooking.eu", dev_port: 3070, web_channel: false, mcp: true, gateway: true,
+    show_in_launcher: false, roles: [ [ "user", "Uses the MCP tools of the apps they have MCP access to" ] ], redirect_uris: [] },
+  # Data sources the gateway reaches with its own read-only credentials (MCP only, no client of their own).
+  { slug: "staging-sql", name: "Staging SQL Server", description: "Read-only SQL on the staging databases, through the MCP Gateway.",
+    icon: "logs", web: false, web_channel: false, mcp: true, show_in_launcher: false,
+    roles: [ [ "viewer", "Runs read-only queries" ], [ "admin", "Manages the source" ] ] },
+  { slug: "eo2-bravo", name: "EO2 Bravo", description: "Bravo's live EO2 Offers API (searches only), through the MCP Gateway.",
+    icon: "logs", web: false, web_channel: false, mcp: true, show_in_launcher: false,
+    roles: [ [ "viewer", "Asks EO2 for offers" ], [ "admin", "Manages the source" ] ] }
 ]
 
 apps.each do |spec|
-  app = App.find_by(slug: spec[:slug]) || App.new(spec.slice(:slug, :name, :description, :icon, :url, :multiple_roles, :role_claim,
-                                                             :admin_permission, :token_scopes)).tap do |new_app|
+  attrs = spec.slice(:slug, :name, :description, :icon, :url, :multiple_roles, :role_claim, :admin_permission, :token_scopes,
+                     :web_channel, :gateway, :show_in_launcher)
+  attrs[:mcp_channel] = true if spec[:mcp]
+  app = App.find_by(slug: spec[:slug]) || App.new(attrs).tap do |new_app|
     spec[:roles].each_with_index { |(key, description), i| new_app.roles.build(key: key, description: description, position: i + 1) }
     new_app.save!
     AuditEvent.record("app.created", subject: new_app, actor: nil, data: { seeded: true })
   end
 
-  # DK Tech is admin in every app (§5.2).
-  if (admin_role = app.role("admin")) && !Grant.exists?(app: app, subject: groups["DK Tech"])
-    Grant.create!(app: app, subject: groups["DK Tech"], app_role: admin_role)
+  # DK Tech is admin in every app (§5.2), on each of its channels (§25).
+  if (admin_role = app.role("admin"))
+    app.channels.each do |channel|
+      next if Grant.exists?(app: app, subject: groups["DK Tech"], channel: channel)
+      Grant.create!(app: app, subject: groups["DK Tech"], app_role: admin_role, channel: channel)
+    end
   end
 
   # The web client (confidential; its secret is generated in the admin UI) and, for apps with a
   # browser extension, the public extension client. Its redirect URI is https://<extension-id>.chromiumapp.org/
   # for each extension id fixed by a manifest "key" (§10); without one it has none until an admin adds it.
-  base = URI(spec[:url]).then { "#{_1.scheme}://#{_1.host}" }
-  local = "http://localhost:#{spec[:dev_port]}"
   spec[:web] == false || Client.find_or_create_by!(client_id: "#{spec[:slug]}-web") do |client|
+    base = URI(spec[:url]).then { "#{_1.scheme}://#{_1.host}" }
+    local = "http://localhost:#{spec[:dev_port]}"
     client.app = app
     client.kind = "web"
     client.name = "#{spec[:name]} web"
-    client.redirect_uris = [ "#{base}/sso/callback", "#{local}/sso/callback" ]
-    client.post_logout_redirect_uris = spec[:post_logout] || [ "#{base}/", "#{local}/" ]
+    client.redirect_uris = spec[:redirect_uris] || [ "#{base}/sso/callback", "#{local}/sso/callback" ]
+    client.post_logout_redirect_uris = spec[:redirect_uris] ? [] : (spec[:post_logout] || [ "#{base}/", "#{local}/" ])
   end
   next unless spec[:extension]
   Client.find_or_create_by!(client_id: "#{spec[:slug]}-extension") do |client|

@@ -58,6 +58,15 @@ running and deploying.
   `OauthToken`, `PersonalToken` (`issue!` → plain `tpa_<slug>_…`, `find_by_plain`, `usable?`, `revoke!`),
   `UsageCount.increment!`, `AuditEvent.record`, `Current`.
 - `app/models/concerns/hashed_token.rb`: SHA-256 digest + hint, `assign_new_token(prefix:)`, `find_by_token`.
+- Web and MCP access, the MCP Gateway (SPECS.md §25): `App#channels` / `#channel?` / `#gateway?` / `#token_channel`
+  (columns `web_channel`, `mcp_channel`, `gateway`), `Grant#channel` (scopes `web`, `mcp`, `on(channel)`); every
+  `EffectiveRole` method and `GrantChange.set/add` take `channel:` (default `"web"`, so the ID token, access API and
+  members list are unchanged); the gateway app's access is derived (`EffectiveRole::DERIVED_SOURCE`) and
+  `EffectiveRole.mcp_backends_for(user)` is introspection's `mcp_access`. `AccessChange.track(…, channels:)`.
+  `PersonalToken.offered_apps` (the Tokens page: the gateway, and web apps not behind it). `ExchangedToken`
+  (`tpe_<slug>_`, 5 minutes) issued by `Oidc::TokenExchange` (grant type in `Oauth::TokensController`) and answered by
+  `Oidc::Introspection#exchanged`. Admin views have a row per (app, channel); `channel_pill` in ApplicationHelper.
+  Tests: test/integration/mcp_gateway_test.rb, test/db/add_channels_test.rb.
 - `app/services/effective_role.rb`: §5.3 — `EffectiveRole.for(user, app)`, `.apps_for(user)`, `.members_of(app)`,
   results with `role`, `role_key`, `source` ("direct" or the group's name), `to_s` ("responder, from RO Dev"); for a
   multiple-roles app (§23.2) `held` (roles with sources), `role_keys`, `permissions`, `permission_sources`,
@@ -137,5 +146,7 @@ running and deploying.
   access level or login method is shown, never hidden. `/api/v1/index` feeds an extension that may be old: add fields,
   never rename or remove without bumping its `VERSION`. Content is data: change db/seeds/index only for what a fresh
   database should start with.
+- **Channels are independent** (§25): never let a web grant give MCP access or the reverse, never issue an exchanged
+  token to anything but a gateway app's web client, and never forward or log a gateway or exchanged token.
 - **Never weaken the sign-in rules without the user's explicit permission**: tenant check, session lifetimes,
   admin re-authentication, the admin network check, PKCE/state/nonce. Propose the change instead.

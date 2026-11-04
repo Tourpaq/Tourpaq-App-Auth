@@ -5,7 +5,7 @@
     <%= link_to "Download CSV", admin_access_matrix_path(format: :csv, with_access: params[:with_access]), class: "btn-secondary" %>
   </div>
 </div>
-<p class="muted">Each active user's effective role in each active app. Hover a role to see where it comes from.</p>
+<p class="muted">Each active user's effective role in each active app, per channel (Web, MCP through the MCP Gateway). Hover a role to see where it comes from.</p>
 
 <%= form_with url: admin_access_matrix_path, method: :get, class: "filters", data: { controller: "submit-on-change" } do |f| %>
   <div>
@@ -19,15 +19,15 @@
     <thead>
       <tr>
         <th>User</th>
-        <% @apps.each do |app| %><th><%= link_to app.name, members_admin_app_path(app) %></th><% end %>
+        <% @columns.each do |app, channel| %><th><%= link_to app.name, members_admin_app_path(app, channel: channel) %><% if app.channels.size > 1 || channel != "web" %> <%= channel_pill(channel) %><% end %></th><% end %>
       </tr>
     </thead>
     <tbody>
       <% @users.each do |user| %>
         <tr>
           <td><%= link_to user.display_name, admin_user_path(user) %><div class="muted small"><%= user.email %></div></td>
-          <% @apps.each do |app| %>
-            <% access = @roles[app.id][user.id] %>
+          <% @columns.each do |app, channel| %>
+            <% access = @roles[[ app.id, channel ]][user.id] %>
             <td class="matrix-cell">
               <% if access %>
                 <span title="<%= access.to_s %>"><%= role_badge(access) %></span>
@@ -42,4 +42,4 @@
     </tbody>
   </table>
 </div>
-<p class="muted small"><%= pluralize(@users.size, "user") %> × <%= pluralize(@apps.size, "app") %>.</p>
+<p class="muted small"><%= pluralize(@users.size, "user") %> × <%= pluralize(@apps.size, "app") %> (<%= pluralize(@columns.size, "column") %>).</p>

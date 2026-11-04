@@ -1,4 +1,6 @@
-# (app, user or group) → role (SPECS.md §5.3). A grant to a user with no role (app_role nil)
+# (app, user or group, channel) → role (SPECS.md §5.3, §25). The channel is "web" (sign-in, ID token, access API,
+# the app's own personal tokens) or "mcp" (through the MCP Gateway); each is granted on its own, and the app must
+# have the channel. A grant to a user with no role (app_role nil)
 # means "no access" and overrides that user's groups for the app.
 #
 # One grant per (app, subject) in a single-role app. In a multiple-roles app (§23.2) a subject may hold
@@ -15,12 +17,17 @@ class Grant < ApplicationRecord
   belongs_to :app_role, optional: true
 
   validates :subject_type, inclusion: { in: SUBJECT_TYPES }
+  validates :channel, inclusion: { in: App::CHANNELS }
+  validate :channel_of_the_app
   validate :one_grant_per_subject_or_role
   validate :role_belongs_to_app
   validate :no_access_only_for_users
 
   scope :for_users, -> { where(subject_type: "User") }
   scope :for_groups, -> { where(subject_type: "Group") }
+  scope :web, -> { where(channel: "web") }
+  scope :mcp, -> { where(channel: "mcp") }
+  scope :on, ->(channel) { where(channel: channel.to_s) }
 
   # Grants this one replaces in the same change (GrantChange.add): left out of the rules above.
   attr_accessor :replacing_ids
@@ -34,7 +41,7 @@ class Grant < ApplicationRecord
   private
 
   def siblings
-    scope = Grant.where(app_id: app_id, subject_type: subject_type, subject_id: subject_id)
+    scope = Grant.where(app_id: app_id, subject_type: subject_type, subject_id: subject_id, channel: channel)
     scope = scope.where.not(id: id) if persisted?
     scope = scope.where.not(id: replacing_ids) if replacing_ids.present?
     scope
@@ -55,6 +62,10 @@ class Grant < ApplicationRecord
 
   def role_belongs_to_app
     errors.add(:app_role, "is not a role of #{app.name}") if app_role && app && app_role.app_id != app_id
+  end
+
+  def channel_of_the_app
+    errors.add(:channel, "#{App.channel_label(channel)} is not a channel of #{app.name}") if app && channel.present? && !app.channel?(channel)
   end
 
   def no_access_only_for_users

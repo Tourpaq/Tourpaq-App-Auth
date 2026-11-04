@@ -1,5 +1,6 @@
-# The Tokens page (SPECS.md §9.1), on the index host: the signed-in user's personal API/MCP tokens. Create one for an app
-# they have access to (name, a scope from that app's own list — read / read_write by default, the Dashboard's
+# The Tokens page (SPECS.md §9.1, §25.4), on the index host: the signed-in user's personal API/MCP tokens. Create one
+# for the MCP Gateway (one token for every MCP tool they have) or an app they have web access to that is not behind
+# the gateway (PersonalToken.offered_apps) (name, a scope from that app's own list — read / read_write by default, the Dashboard's
 # public / all, §23.3 — lifetime 30 / 90 / 365 days), see it once, list
 # them (app, name, scope, created, expires, last used) and revoke them. At most
 # PersonalToken::MAX_ACTIVE active tokens. PersonalToken.issue! and #revoke! write the audit events.
@@ -45,7 +46,7 @@ class Index::TokensController < Index::BaseController
 
   private
 
-  def accessible_apps = @accessible_apps ||= EffectiveRole.apps_for(current_user).map(&:app)
+  def accessible_apps = @accessible_apps ||= PersonalToken.offered_apps(current_user)
 
   # The scope list follows the chosen app (the token-scopes Stimulus controller swaps it; the server checks it).
   def load_page

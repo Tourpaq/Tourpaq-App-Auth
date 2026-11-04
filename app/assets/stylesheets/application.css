@@ -143,6 +143,7 @@ form.button_to { display:inline-block; margin:0; }
 .pill-bad { color:#a40e26; background:#ffebe9; border-color:#ffc1bc; }
 .pill-warn { color:#7d4e00; background:#fff8c5; border-color:#e5d38a; }
 .pill-muted { color:var(--muted); background:var(--bg); border-color:var(--border); }
+.pill.channel-mcp { color:#5a32a3; background:#f3efff; border-color:#d8ccf5; }
 .chip { display:inline-block; font-size:12px; padding:2px 8px; border-radius:10px; background:var(--bg); border:1px solid var(--border); margin:1px 2px 1px 0; }
 
 /* --- Shown-once values (client secrets, personal tokens) ---------------------- */

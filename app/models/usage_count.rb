@@ -1,7 +1,7 @@
 # Access checks and introspections are counted per client and day instead of audited (SPECS.md §12).
 #   UsageCount.increment!(client, "introspect")
 class UsageCount < ApplicationRecord
-  KINDS = %w[access introspect].freeze
+  KINDS = %w[access introspect exchange].freeze
 
   belongs_to :client
 

@@ -26,7 +26,7 @@ of M2–M5's protocol: the OIDC provider (§7, §7.6), the admin host signing in
 API (§8), personal tokens with introspection (§9) and extension refresh tokens (§10), with the recurring jobs (§15).
 The auth app's side of M7 is built too: permission-carrying roles with the catalogue push and the per-app
 last-administrator guard (§23.2), per-app token scopes (§23.3), the Dashboard's registration and its import (§23.5).
-On 17 Oct 2026 the hosts were restructured (§24): the auth, index and admin hosts, the back-channel hosts, the
+On 4 Nov 2026 web and MCP access per app, the MCP Gateway app and the token exchange were built (§25). On 17 Oct 2026 the hosts were restructured (§24): the auth, index and admin hosts, the back-channel hosts, the
 temporary Entra redirect hop through home.app, and SQLite only on developer machines. The same day the index content
 module was built (§24.3): Tourpaq-App-WWW's index merged into the index host, its admin on the admin host, its
 extension in `clients/index-extension` signing in through auth.app, and the export/import of WWW's production content.
@@ -237,6 +237,9 @@ A grant is *(app, subject, role)*, where the subject is a user or a group. For a
 
 The admin UI always shows where an effective role comes from ("responder, from RO Dev"), on the user's
 page and on the app's members page.
+
+*Built (§25):* grants and the effective role are per **channel**, web or MCP (through the MCP Gateway); these rules
+apply to each channel's grants on their own.
 
 In an app with multiple roles (§23.2) rules 1 and 2 become a union: the user holds every role of their direct grants
 and of their groups' grants, and gets the union of those roles' permissions. A direct **no access** still overrides
@@ -485,7 +488,7 @@ permissions change. `Cache-Control: private, no-cache`
 
 ### 9.1 Creating and holding them
 
-- Created by the user on their **Tokens** page on the index host (`/tokens` on index.app): **app** (only apps they have access to), **name**
+- Created by the user on their **Tokens** page on the index host (`/tokens` on index.app): **app** (only apps they have access to; since §25 the MCP Gateway, and no app reached through it), **name**
   ("Claude Code on my laptop"), **scope** (from the app's own scope list, §23.3: `read` or `read_write` by default),
   **lifetime** (30, 90 or 365 days, default 90).
 - The format is `tpa_<app slug>_<43 chars of urlsafe base64 of 32 random bytes>`, e.g. `tpa_irm_k3J…`. The prefix
@@ -724,6 +727,8 @@ user agent and time. These are the IRM's conventions.
   and `grant.created`.
 - `oauth.authorized` (which app), `oauth.denied`, `oauth.refresh_reused`
 - `token.created`, `token.revoked`, `token.expired`
+- *Built, for §25:* `token.exchanged` (at most once per gateway token, app and 5 minutes), `app.channels_changed`
+  (the migration), and `channel` in the `grant.*` events' `data` (and per user, when not web)
 - *Built, by the web UI:* `session.ended` (a user or an admin ended one session), `oauth.revoked` (an extension
   signed out from the profile or the user's admin page), `group.created`, `group.updated`, `group.deleted`,
   `app.created`, `app.updated`, `app.disabled`, `app.enabled`, `app.role_added`, `app.role_changed`,
@@ -1603,3 +1608,106 @@ database copy.
 the `LOGIN_*` lines for the app's environment (audited `client.secret_created`, channel `console`; at most two active
 secrets as always; refused in production unless `FORCE=1`), so an app can be run locally against a local auth app.
 Several test runs side by side use `TEST_DB=storage/test_<name>.sqlite3 PARALLEL_WORKERS=1`.
+
+---
+
+## 25. MCP access and the MCP Gateway (decided and built 4 Nov 2026)
+
+People use Claude with one token for every Tourpaq MCP tool they may use: the **MCP Gateway**
+(`../Tourpaq-App-MCP-Gateway`, https://mcp.app.journeybooking.eu/mcp) sits in front of the apps' MCP servers (the Logs
+Analyzer, the Offers Validator, KPI, …) and of data sources nobody reaches directly (the staging SQL Server, EO2's live
+Offers API, …). This app decides who reaches which of them, and with which role, separately from who may sign in to
+an app on the web. The gateway's own spec (its SPECS.md) covers its side.
+
+### 25.1 Channels: web and MCP access per app
+
+- An app has **channels**: `web` (sign-in, the ID token, the access API, its own personal tokens) and/or `mcp`
+  (reached through the gateway). Columns `apps.web_channel` (default on) and `apps.mcp_channel` (default off); at least
+  one. Seeded: the Logs Analyzer, KPI and the Offers Validator have both; `staging-sql` and `eo2-bravo` only MCP (no
+  client: the gateway reaches them with its own credentials); the other apps only web.
+- A grant is for one channel: *(app, user or group, channel) → role* (`grants.channel`, unique per app, subject,
+  channel and role). The app must have the channel. The effective role (§5.3) is worked out **per channel on its
+  own**: a direct grant wins on its channel, else the highest group role on it, a direct "no access" overrides the
+  groups on that channel only, a disabled user or app has none, and an app without the channel gives nobody access on
+  it. `EffectiveRole.for(user, app, channel: "mcp")`; the default is `web`, so everything that existed before (the ID
+  token, `/api/v1/access`, the members list, introspection of an app's own tokens, extension tokens, the index's "Your
+  apps") reports the web role unchanged.
+- The admin UI shows a row per app and channel on the user's and the group's page (with a Channel column and its own
+  "Set" form), the grants with their channel on the app's page, "Web members" / "MCP members" on an app with both, a
+  column per channel in the access matrix and its CSV (`<slug> mcp`, `<slug> mcp source`), and the channels as
+  checkboxes on the app form. The profile page lists the person's MCP access apart from their web access.
+- Migration `AddChannelsAndExchangedTokens`: every existing grant becomes a web grant, and the apps whose MCP servers
+  move behind the gateway (`logs`, `kpi`, `offers-validator`, where present) get the MCP channel with a copy of each of
+  their grants, so nobody gains or loses anything on the day it ships (until now they reached those MCP servers with
+  their web role). Audited `app.channels_changed` (no actor, channel `system`, `grants_copied_to_mcp`).
+
+### 25.2 The gateway app
+
+- App `mcp` ("MCP Gateway", `apps.gateway`), MCP only, one role `user`, web client `mcp-web` with no redirect URI (it
+  only introspects gateway tokens and exchanges them). Not in the launcher. A gateway app must be MCP only and cannot
+  have multiple roles.
+- Access to it is **derived**: a person has its role `user` (source "MCP access") while they hold an MCP role in at
+  least one other active app, unless a direct grant on the gateway says otherwise. A direct **no access** grant on the
+  gateway (MCP channel) is the switch that stops one person's gateway use without touching their other grants.
+
+### 25.3 The gateway token and `mcp_access`
+
+- People create the gateway token on the Tokens page like any personal token (§9.1): `tpa_mcp_…`, 30, 90 or 365 days,
+  scope `read` or `read_write`. It follows the person's MCP-channel access to the gateway (`App#token_channel`).
+- Introspecting it as `mcp-web` gives the §9.2 answer plus the apps behind the gateway where the person holds an MCP
+  role, active ones only, sorted by slug (`roles` and `permissions` too for a multiple-roles app), and is `active: false`
+  when there are none:
+
+  ```json
+  "mcp_access": [
+    { "app": "logs", "name": "Logs Analyzer", "role": "admin" },
+    { "app": "staging-sql", "name": "Staging SQL Server", "role": "viewer" }
+  ]
+  ```
+
+### 25.4 The Tokens page
+
+The Tokens page offers the gateway (while the person has MCP access to something) and the apps they have a **web**
+role in that are **not** reached through the gateway (`PersonalToken.offered_apps`): an app with the MCP channel no
+longer offers tokens of its own, since one gateway token covers its MCP tools. Existing per-app tokens are **not**
+revoked: they work until they expire (the apps keep accepting them), so nothing breaks on the day this ships. The IRM,
+Azure Cost and Home keep their own tokens until their MCP servers move behind the gateway. Service tokens and extension
+tokens are not affected.
+
+### 25.5 The token exchange (RFC 8693)
+
+`POST /oauth/token` on the back-channel with `grant_type=urn:ietf:params:oauth:grant-type:token-exchange`,
+`subject_token` (the person's gateway token), `subject_token_type` and optionally `requested_token_type`
+(`urn:ietf:params:oauth:token-type:access_token`), and `audience` (an app slug); `Oidc::TokenExchange`.
+
+- The caller is a **web client of a gateway app**, else `400 unauthorized_client` (`401 invalid_client` without valid
+  credentials, as always).
+- `subject_token` must be a usable personal token of that gateway app, else `400 invalid_grant` (also for a disabled
+  user or a revoked token).
+- `audience` must be an active app with the MCP channel, not a gateway, where the person holds an **MCP** role, else
+  `400 invalid_target` (a web role does not count).
+- Issued: `tpe_<audience>_<43 chars>`, stored as SHA-256 with a hint (`exchanged_tokens`, linked to the gateway token,
+  the audience, the gateway's client and the person), `expires_in` 300, `scope` = the gateway token's scope when the
+  audience has it, else the audience's lowest token scope. Answer: `access_token`, `issued_token_type`, `token_type`
+  `Bearer`, `expires_in`, `scope`.
+- Introspection of a `tpe_` token by the **audience's** web client: `token_type` `exchanged`, the person, the scope,
+  `role` = their **MCP-channel** role in the app (and `roles` / `permissions` for a multiple-roles app), `exp`,
+  `token_name` = the gateway token's name, `act: { client_id }` = the gateway's client. Any other client gets
+  `active: false`, and so does the audience once the token expired, the gateway token was revoked (its exchanged
+  tokens are deleted with it), the person lost the MCP role, or the app or the gateway's client was disabled.
+- Counted per client and day (`UsageCount` "exchange"); audited `token.exchanged` (the gateway token as subject, the
+  person as actor, the audience as app; `client_id`, `audience`, `scope`, `hint`) at most once per gateway token, app
+  and 5 minutes. Its own rate limit: 600 a minute per client (the other grants keep 60 a minute per client and
+  address). Discovery lists the grant type. Expired exchanged tokens are deleted by the hourly `CleanupJob` an hour
+  after they ran out.
+
+### 25.6 The apps behind the gateway, and the gem
+
+- An app behind the gateway accepts `tpe_<slug>_…` on its **MCP endpoint only** (not its REST API), introspects it like
+  a personal token and applies its own rules to the answer's role and scope: the Logs Analyzer, the Offers Validator
+  and KPI do (`AuthToken.authenticate(…, exchanged: true)`). They keep accepting existing `tpa_<slug>_` tokens.
+- Gem 0.3.2: `Tokens::Result#exchanged?`, and the fake provider issues exchanged tokens
+  (`issue_token(sub:, token_type: "exchanged")`, `tpe_…`, 5 minutes). Synced to the Logs Analyzer, the Offers Validator,
+  KPI and the gateway; the other apps keep 0.3.1 until they next sync (nothing they use changed).
+- `bin/dev-stack` runs the gateway (port 3070) in front of the Logs Analyzer's and KPI's MCP servers
+  (docs/local-testing.md).

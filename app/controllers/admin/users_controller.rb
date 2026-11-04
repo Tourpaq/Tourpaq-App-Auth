@@ -39,8 +39,8 @@ class Admin::UsersController < Admin::BaseController
 
   def show
     @apps = App.ordered.includes(:roles).to_a
-    @access = @apps.to_h { [ _1.id, EffectiveRole.for(@user, _1) ] }
-    @direct = @user.grants.includes(:app_role).group_by(&:app_id)
+    @access = @apps.flat_map { |app| app.channels.map { [ [ app.id, _1 ], EffectiveRole.for(@user, app, channel: _1) ] } }.to_h
+    @direct = @user.grants.includes(:app_role).group_by { [ _1.app_id, _1.channel ] }
     @memberships = @user.group_memberships.includes(:group).sort_by { _1.group.name.downcase }
     @other_groups = Group.ordered.where.not(id: @memberships.map(&:group_id))
     @sessions = @user.sessions.active.recent_first.to_a

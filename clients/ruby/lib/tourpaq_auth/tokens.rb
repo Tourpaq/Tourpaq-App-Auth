@@ -1,5 +1,5 @@
 module TourpaqAuth
-  # Token introspection (SPECS.md §9.2, §10): is this personal (tpa_…) or extension (tpx_…) token valid,
+  # Token introspection (SPECS.md §9.2, §10, §25.5): is this personal (tpa_…), extension (tpx_…) or exchanged (tpe_…) token valid,
   # for whom, with which scope and role? Answers are cached for 60 seconds under the token's SHA-256;
   # the token itself is never stored, cached or logged.
   module Tokens
@@ -19,6 +19,9 @@ module TourpaqAuth
       end
 
       def active? = active == true
+      # A token the MCP Gateway got for this app by the token exchange (tpe_…, the auth app's SPECS.md §25.5): it
+      # names the person, their MCP-channel role and a scope no wider than their gateway token's.
+      def exchanged? = active? && token_type == "exchanged"
       def read_write? = active? && scope == "read_write"
       def read? = active? && %w[read read_write].include?(scope)
       # Is the token's scope one of these (e.g. scope?("all"))?

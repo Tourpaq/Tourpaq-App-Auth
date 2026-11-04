@@ -158,6 +158,12 @@ roles yourself, e.g. `token.read_write? && %w[responder editor admin].include?(t
 with `Retry-After`; override `tourpaq_auth_token_refused(reason)` / `tourpaq_auth_token_unavailable` to answer
 differently. Directly: `TourpaqAuth::Tokens.introspect(token)`.
 
+**Behind the MCP Gateway** (the auth app's SPECS.md §25, 0.3.2): an app with the MCP channel gets its MCP calls from
+the gateway with an exchanged token, `tpe_<slug>_…` (5 minutes, `token_type` "exchanged", `exchanged?`), instead of
+people's own `tpa_<slug>_…`. Accept both prefixes on your MCP endpoint and introspect them alike: the answer names
+the person, their **MCP-channel** role in your app and a scope no wider than their gateway token's. In tests:
+`provider.issue_token(sub:, token_type: "exchanged")`.
+
 ## Permission apps (SPECS.md §23.2, §23.3)
 
 An app registered in the auth app with **multiple roles** (the Dashboard) gets, for each user, the names of the roles

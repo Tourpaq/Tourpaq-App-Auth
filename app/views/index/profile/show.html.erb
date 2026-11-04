@@ -35,6 +35,30 @@
   <p class="empty">No access to any app yet. An admin has been told.</p>
 <% end %>
 
+<% if @mcp_access.any? %>
+  <h2>My MCP access</h2>
+  <p class="muted small">What Claude and other MCP clients reach as you through the MCP Gateway, with one token from
+    <%= link_to "Tokens", index_tokens_path %>. Granted apart from the web access above.</p>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>App</th><th>Role</th><th>From</th></tr></thead>
+      <tbody>
+        <% @mcp_access.each do |access| %>
+          <tr>
+            <td><%= access.app.name %></td>
+            <% if access.multiple? %>
+              <td colspan="2"><%= effective_role_label(access) %></td>
+            <% else %>
+              <td><%= role_badge(access) %></td>
+              <td class="muted"><%= access.direct? ? "given to you directly" : "group #{access.source}" %></td>
+            <% end %>
+          </tr>
+        <% end %>
+      </tbody>
+    </table>
+  </div>
+<% end %>
+
 <h2>Sessions</h2>
 <p class="muted small">Your sign-ins (auth) and the index's own sessions (index). A session ends after 8 hours without use, and 7 days after the Microsoft sign-in.</p>
 <div class="table-wrap">

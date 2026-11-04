@@ -16,7 +16,7 @@ class Oauth::DiscoveryController < Oauth::ApiController
       end_session_endpoint: "#{issuer}/oauth/logout",
       response_types_supported: [ "code" ],
       response_modes_supported: [ "query" ],
-      grant_types_supported: %w[authorization_code refresh_token],
+      grant_types_supported: %w[authorization_code refresh_token] + [ Oidc::TokenExchange::GRANT_TYPE ],
       subject_types_supported: [ "public" ],
       id_token_signing_alg_values_supported: [ Oidc::SigningKeys::ALGORITHM ],
       scopes_supported: Oidc::TokenGrant::SUPPORTED_SCOPES,

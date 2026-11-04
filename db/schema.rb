@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_10_19_090001) do
+ActiveRecord::Schema[8.1].define(version: 2026_11_04_100001) do
   create_table "app_permissions", force: :cascade do |t|
     t.integer "app_id", null: false
     t.string "key", null: false
@@ -51,6 +51,9 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_19_090001) do
     t.string "admin_permission"
     t.json "token_scopes", default: ["read", "read_write"], null: false
     t.datetime "catalogue_pushed_at"
+    t.boolean "web_channel", default: true, null: false
+    t.boolean "mcp_channel", default: false, null: false
+    t.boolean "gateway", default: false, null: false
     t.index ["slug"], name: "index_apps_on_slug", unique: true
   end
 
@@ -123,6 +126,24 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_19_090001) do
     t.index ["client_id"], name: "index_clients_on_client_id", unique: true
   end
 
+  create_table "exchanged_tokens", force: :cascade do |t|
+    t.integer "personal_token_id", null: false
+    t.integer "app_id", null: false
+    t.integer "client_id", null: false
+    t.integer "user_id", null: false
+    t.string "token_digest", null: false
+    t.string "token_hint", null: false
+    t.string "scope", null: false
+    t.datetime "expires_at", null: false
+    t.datetime "created_at", null: false
+    t.index ["app_id"], name: "index_exchanged_tokens_on_app_id"
+    t.index ["client_id"], name: "index_exchanged_tokens_on_client_id"
+    t.index ["expires_at"], name: "index_exchanged_tokens_on_expires_at"
+    t.index ["personal_token_id"], name: "index_exchanged_tokens_on_personal_token_id"
+    t.index ["token_digest"], name: "index_exchanged_tokens_on_token_digest", unique: true
+    t.index ["user_id"], name: "index_exchanged_tokens_on_user_id"
+  end
+
   create_table "grants", force: :cascade do |t|
     t.integer "app_id", null: false
     t.string "subject_type", null: false
@@ -130,7 +151,8 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_19_090001) do
     t.integer "app_role_id"
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
-    t.index ["app_id", "subject_type", "subject_id", "app_role_id"], name: "index_grants_on_app_subject_and_role", unique: true
+    t.string "channel", default: "web", null: false
+    t.index ["app_id", "subject_type", "subject_id", "channel", "app_role_id"], name: "index_grants_on_app_subject_channel_and_role", unique: true
     t.index ["app_id"], name: "index_grants_on_app_id"
     t.index ["app_role_id"], name: "index_grants_on_app_role_id"
     t.index ["subject_type", "subject_id"], name: "index_grants_on_subject"
@@ -524,7 +546,6 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_19_090001) do
     t.index ["sub"], name: "index_users_on_sub", unique: true
   end
 
-  add_foreign_key "app_permissions", "apps"
   add_foreign_key "app_roles", "apps"
   add_foreign_key "audit_events", "apps"
   add_foreign_key "audit_events", "users", column: "actor_id"
@@ -534,6 +555,10 @@ ActiveRecord::Schema[8.1].define(version: 2026_10_19_090001) do
   add_foreign_key "client_secrets", "clients"
   add_foreign_key "client_secrets", "users", column: "created_by_id"
   add_foreign_key "clients", "apps"
+  add_foreign_key "exchanged_tokens", "apps"
+  add_foreign_key "exchanged_tokens", "clients"
+  add_foreign_key "exchanged_tokens", "personal_tokens"
+  add_foreign_key "exchanged_tokens", "users"
   add_foreign_key "grants", "app_roles"
   add_foreign_key "grants", "apps"
   add_foreign_key "group_memberships", "groups"

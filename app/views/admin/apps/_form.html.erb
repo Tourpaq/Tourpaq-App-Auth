@@ -54,6 +54,12 @@
       </div>
     <% end %>
     <div class="field full">
+      <label class="check"><%= f.check_box :web_channel %> Web: people sign in to the app (and may create its own personal tokens)</label>
+      <label class="check"><%= f.check_box :mcp_channel %> MCP: people reach the app through the MCP Gateway</label>
+      <label class="check"><%= f.check_box :gateway %> This app is the MCP Gateway (MCP only; access follows the MCP access to the other apps)</label>
+      <p class="hint">Each channel is granted on its own (SPECS.md §25), so a person may have the web, MCP, or both.</p>
+    </div>
+    <div class="field full">
       <label class="check"><%= f.check_box :show_in_launcher %> Show in the launcher</label>
       <% unless app.new_record? %>
         <label class="check"><%= check_box_tag "app[disabled]", "1", app.disabled?, id: "app_disabled" %> Disabled: no tokens, API calls refused, nobody has access</label>

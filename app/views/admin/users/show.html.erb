@@ -36,18 +36,22 @@
 </div>
 
 <h2>Access</h2>
-<p class="muted small">The effective role per app and where it comes from. A direct grant wins over the groups,
-  and may also be "no access". Removing the direct grant leaves what the groups give. In apps with several roles per
-  user the direct roles add to the groups' roles, and the resolved permissions show where each comes from.</p>
+<p class="muted small">The effective role per app and channel, and where it comes from. Web is signing in to the app (and
+  its own tokens); MCP is reaching it through the MCP Gateway. Each channel is granted on its own. A direct grant wins
+  over the groups, and may also be "no access". Removing the direct grant leaves what the groups give. In apps with
+  several roles per user the direct roles add to the groups' roles, and the resolved permissions show where each comes
+  from. The MCP Gateway follows the MCP access elsewhere unless a direct grant says otherwise.</p>
 <div class="table-wrap">
   <table class="access-table">
-    <thead><tr><th>App</th><th>Effective role</th><th>Direct grant</th><th>Set direct grant</th></tr></thead>
+    <thead><tr><th>App</th><th>Channel</th><th>Effective role</th><th>Direct grant</th><th>Set direct grant</th></tr></thead>
     <tbody>
       <% @apps.each do |app| %>
-        <% access = @access[app.id] %>
-        <% grants = @direct.fetch(app.id, []) %>
+      <% app.channels.each do |channel| %>
+        <% access = @access[[ app.id, channel ]] %>
+        <% grants = @direct.fetch([ app.id, channel ], []) %>
         <tr class="<%= 'row-muted' if app.disabled? %>">
           <td><%= link_to app.name, admin_app_path(app) %><% if app.disabled? %> <span class="pill pill-muted">app disabled</span><% end %></td>
+          <td><%= channel_pill(channel) %></td>
           <td>
             <%= effective_role_label(access) %>
             <% if app.multiple_roles? && access.access? %><%= permissions_details(access) %><% end %>
@@ -76,20 +80,22 @@
               <%= hidden_field_tag :app_id, app.id, id: nil %>
               <%= hidden_field_tag :subject_type, "User", id: nil %>
               <%= hidden_field_tag :subject_id, @user.id, id: nil %>
+              <%= hidden_field_tag :channel, channel, id: nil %>
               <% if app.multiple_roles? %>
                 <% held = grants.map(&:app_role_id) %>
                 <% options = app.roles.reject { held.include?(_1.id) }.sort_by { _1.key.downcase }.map { [ _1.key, _1.key ] } %>
                 <% options << [ "no access", "none" ] unless grants.any?(&:no_access?) %>
-                <%= select_tag :role, options_for_select(options), id: "grant_role_#{app.id}", "aria-label": "Role in #{app.name}" %>
+                <%= select_tag :role, options_for_select(options), id: channel == "web" ? "grant_role_#{app.id}" : "grant_role_#{app.id}_#{channel}", "aria-label": "Role in #{app.name} (#{App.channel_label(channel)})" %>
                 <%= f.submit "Add", class: "btn-secondary btn-small" %>
               <% else %>
                 <%= select_tag :role, options_for_select(app.role_keys.map { [ _1, _1 ] } + [ [ "no access", "none" ] ], (grant = grants.first) ? (grant.app_role&.key || "none") : app.lowest_role&.key),
-                      id: "grant_role_#{app.id}", "aria-label": "Role in #{app.name}" %>
+                      id: channel == "web" ? "grant_role_#{app.id}" : "grant_role_#{app.id}_#{channel}", "aria-label": "Role in #{app.name} (#{App.channel_label(channel)})" %>
                 <%= f.submit "Set", class: "btn-secondary btn-small" %>
               <% end %>
             <% end %>
           </td>
         </tr>
+      <% end %>
       <% end %>
     </tbody>
   </table>

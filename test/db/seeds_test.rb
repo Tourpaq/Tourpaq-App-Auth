@@ -33,9 +33,23 @@ class SeedsTest < ActiveSupport::TestCase
     assert_equal "https://index.app.journeybooking.eu", App.find_by!(slug: "index").url
     %w[logs azure-cost index].each { assert_equal %w[viewer admin], App.find_by!(slug: _1).role_keys }
 
-    App.where.not(slug: "home").find_each do |app|
-      assert_equal "admin, from DK Tech", EffectiveRole.for(User.find_by_email("mwi@tourpaq.com"), app).to_s, app.slug
+    mwi = User.find_by_email("mwi@tourpaq.com")
+    App.where.not(slug: "home").where(gateway: false).find_each do |app|
+      app.channels.each do |channel|
+        assert_equal "admin, from DK Tech", EffectiveRole.for(mwi, app, channel: channel).to_s, "#{app.slug} #{channel}"
+      end
     end
+
+    # Channels and the MCP Gateway (§25): the apps whose MCP servers sit behind the gateway, the gateway itself (MCP
+    # only, access derived) with its client, and the data sources it reaches (MCP only, no client).
+    assert_equal %w[kpi logs offers-validator], App.where(web_channel: true, mcp_channel: true).order(:slug).pluck(:slug)
+    assert_equal %w[eo2-bravo mcp staging-sql], App.where(web_channel: false).order(:slug).pluck(:slug)
+    gateway = App.find_by!(slug: "mcp")
+    assert gateway.gateway?
+    assert_equal %w[user], gateway.role_keys
+    assert_equal "user, from MCP access", EffectiveRole.for(mwi, gateway, channel: "mcp").to_s
+    assert_empty Client.find_by!(client_id: "mcp-web").redirect_uris
+    assert_not Client.exists?(client_id: "staging-sql-web")
 
     # Home, formerly the Dashboard (§23): multiple roles, no roles yet (its standard roles or the import create them),
     # its scopes and claims, client home-web. It stays at home.app (§24.1).
@@ -52,7 +66,8 @@ class SeedsTest < ActiveSupport::TestCase
     assert_equal [ "https://home.app.journeybooking.eu/" ], dashboard_web.post_logout_redirect_uris
 
     # The index host signs in as the internal client "index" (§24.1): no index-web.
-    assert_equal %w[admin azure-cost-web home-web index index-extension irm-extension irm-web kpi-web logs-web], Client.order(:client_id).pluck(:client_id)
+    assert_equal %w[admin azure-cost-web home-web index index-extension irm-extension irm-web kpi-web logs-web mcp-web offers-validator-web],
+                 Client.order(:client_id).pluck(:client_id)
     web = Client.find_by!(client_id: "irm-web")
     assert web.redirect_uri_allowed?("https://irm.app.journeybooking.eu/sso/callback")
     assert web.redirect_uri_allowed?("http://localhost:3030/sso/callback")

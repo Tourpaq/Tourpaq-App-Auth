@@ -9,16 +9,19 @@
 </div>
 
 <h2>Access</h2>
-<p class="muted small">The role this group gives its members in each app. A member's direct grant wins over it. In apps with
-  several roles per user the group may give several, and members get them on top of their own.</p>
+<p class="muted small">The role this group gives its members in each app, per channel: Web is signing in to the app, MCP is
+  reaching it through the MCP Gateway. A member's direct grant wins over it. In apps with several roles per user the
+  group may give several, and members get them on top of their own.</p>
 <div class="table-wrap">
   <table class="access-table">
-    <thead><tr><th>App</th><th>Group role</th><th>Set</th></tr></thead>
+    <thead><tr><th>App</th><th>Channel</th><th>Group role</th><th>Set</th></tr></thead>
     <tbody>
-      <% @apps.each do |app| %>
-        <% grants = @grants.fetch(app.id, []) %>
+      <% @apps.reject(&:gateway?).each do |app| %>
+      <% app.channels.each do |channel| %>
+        <% grants = @grants.fetch([ app.id, channel ], []) %>
         <tr class="<%= 'row-muted' if app.disabled? %>">
           <td><%= link_to app.name, admin_app_path(app) %><% if app.multiple_roles? %> <span class="pill pill-muted">several roles</span><% end %></td>
+          <td><%= channel_pill(channel) %></td>
           <td>
             <% if app.multiple_roles? && grants.any? %>
               <ul class="chip-list">
@@ -45,12 +48,14 @@
                 <%= hidden_field_tag :app_id, app.id, id: nil %>
                 <%= hidden_field_tag :subject_type, "Group", id: nil %>
                 <%= hidden_field_tag :subject_id, @group.id, id: nil %>
-                <%= select_tag :role, options_for_select(options, app.multiple_roles? ? nil : (grants.first&.app_role&.key || app.lowest_role&.key)), id: "grant_role_#{app.id}", "aria-label": "Role in #{app.name}" %>
+                <%= hidden_field_tag :channel, channel, id: nil %>
+                <%= select_tag :role, options_for_select(options, app.multiple_roles? ? nil : (grants.first&.app_role&.key || app.lowest_role&.key)), id: channel == "web" ? "grant_role_#{app.id}" : "grant_role_#{app.id}_#{channel}", "aria-label": "Role in #{app.name} (#{App.channel_label(channel)})" %>
                 <%= f.submit app.multiple_roles? ? "Add" : "Set", class: "btn-secondary btn-small" %>
               <% end %>
             <% end %>
           </td>
         </tr>
+      <% end %>
       <% end %>
     </tbody>
   </table>

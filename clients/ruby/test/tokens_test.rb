@@ -28,6 +28,19 @@ class TokensTest < TourpaqAuthTestCase
     end
   end
 
+  def test_exchanged_tokens
+    with_auth do |provider|
+      sub = provider.add_user(email: "a@tourpaq.com", role: "admin")
+      token = provider.issue_token(sub: sub, scope: "read_write", token_type: "exchanged")
+      assert token.start_with?("tpe_test_")
+      result = TourpaqAuth::Tokens.introspect(token)
+      assert result.exchanged?
+      assert_equal [ "exchanged", "admin", "read_write" ], [ result.token_type, result.role, result.scope ]
+      assert_in_delta TourpaqAuth.now.to_i + 300, result.exp.to_i, 2
+      refute TourpaqAuth::Tokens.introspect(provider.issue_token(sub: sub)).exchanged?
+    end
+  end
+
   def test_extension_tokens
     with_auth do |provider|
       token = provider.issue_token(sub: provider.add_user(email: "x@tourpaq.com"), token_type: "extension", scope: "read_write")

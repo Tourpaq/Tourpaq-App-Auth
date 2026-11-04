@@ -10,14 +10,14 @@ class Admin::AppsController < Admin::BaseController
 
   def index
     @apps = App.ordered.includes(:roles, :clients).to_a
-    @member_counts = @apps.to_h { [ _1.id, EffectiveRole.members_of(_1).size ] }
+    @member_counts = @apps.to_h { |app| [ app.id, EffectiveRole.members_of(app, channel: app.channels.first).size ] }
     @token_counts = PersonalToken.active.group(:app_id).count
   end
 
   def show
     @clients = @app.clients.ordered.includes(:client_secrets).to_a
     @grants = @app.grants.includes(:subject, :app_role).sort_by { [ _1.subject_type, _1.subject.try(:name) || _1.subject.try(:email) || "" ] }
-    @member_count = EffectiveRole.members_of(@app).size
+    @member_counts = @app.channels.to_h { [ _1, EffectiveRole.members_of(@app, channel: _1).size ] }
     @token_count = @app.personal_tokens.active.count
     @roles_in_use = Grant.where(app_role_id: @app.roles.map(&:id)).group(:app_role_id).count
     @unknown = @app.unknown_permissions
@@ -27,7 +27,8 @@ class Admin::AppsController < Admin::BaseController
   end
 
   def members
-    @members = EffectiveRole.members_of(@app)
+    @channel = params[:channel].presence_in(@app.channels) || @app.channels.first
+    @members = EffectiveRole.members_of(@app, channel: @channel)
   end
 
   def new
@@ -47,7 +48,8 @@ class Admin::AppsController < Admin::BaseController
     keys.each_with_index { |key, i| @app.roles.build(key: key, position: i + 1) }
     if @app.save
       AuditEvent.record("app.created", subject: @app, data: { slug: @app.slug, name: @app.name, roles: @app.role_keys,
-                                                              multiple_roles: @app.multiple_roles?, token_scopes: @app.token_scopes })
+                                                              multiple_roles: @app.multiple_roles?, token_scopes: @app.token_scopes,
+                                                              channels: @app.channels, gateway: @app.gateway? })
       redirect_to admin_app_path(@app), notice: "#{@app.name} is created. Add its web client next."
     else
       render :new, status: :unprocessable_entity
@@ -79,5 +81,6 @@ class Admin::AppsController < Admin::BaseController
     @app = App.includes(:roles).find(params[:id])
   end
 
-  def app_params = params.expect(app: %i[slug name description icon url role_claim show_in_launcher multiple_roles admin_permission token_scope_list])
+  def app_params = params.expect(app: %i[slug name description icon url role_claim show_in_launcher multiple_roles admin_permission token_scope_list
+                                          web_channel mcp_channel gateway])
 end

@@ -18,7 +18,7 @@
             <td class="num"><%= group.users.size %></td>
             <td class="wrap">
               <% group.grants.sort_by { _1.app.name }.each do |grant| %>
-                <span class="chip"><%= grant.app.name %> <%= role_badge(grant.app_role) %></span>
+                <span class="chip"><%= grant.app.name %><% if grant.channel != "web" %> <%= channel_pill(grant.channel) %><% end %> <%= role_badge(grant.app_role) %></span>
               <% end %>
             </td>
           </tr>

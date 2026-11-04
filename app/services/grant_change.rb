@@ -3,6 +3,7 @@
 # (SPECS.md §5.3, §12). Grants do not audit themselves; always change them through here.
 #
 #   grant = GrantChange.set(app:, subject: user_or_group, role: app_role)  # role nil: "no access" (users only)
+#   GrantChange.set(app:, subject:, role:, channel: "mcp")                  # the MCP channel (§25); default "web"
 #   grant.errors.any?                                                       # refused: nothing changed
 #   GrantChange.remove(grant)                                               # grant.errors.any? when refused
 #
@@ -12,7 +13,7 @@
 # would leave nobody with the app's admin permission comes back with an error on the grant.
 #
 # The audit event's subject is the user or group, its app the grant's app, and its data:
-#   { "subject" => "Group RO Dev", "role_before" => "responder", "role_after" => "editor",
+#   { "subject" => "Group RO Dev", "channel" => "web", "role_before" => "responder", "role_after" => "editor",
 #     "users" => [ { "user_id", "email", "before", "after" } ] }
 # where a role is the role key, "no access" for a no-access grant, or nil for no grant; a user's before/after
 # in a multiple-roles app is the sorted list of role names (or nil). Grants replaced by an `add` are listed
@@ -20,9 +21,9 @@
 class GrantChange
   NO_ACCESS = "no access".freeze
 
-  def self.set(app:, subject:, role:)
-    return add(app: app, subject: subject, role: role) if app.multiple_roles?
-    grant = Grant.find_or_initialize_by(app: app, subject: subject)
+  def self.set(app:, subject:, role:, channel: "web")
+    return add(app: app, subject: subject, role: role, channel: channel) if app.multiple_roles?
+    grant = Grant.find_or_initialize_by(app: app, subject: subject, channel: channel.to_s)
     return grant if grant.persisted? && grant.app_role_id == role&.id
 
     action = grant.new_record? ? "grant.created" : "grant.changed"
@@ -32,7 +33,7 @@ class GrantChange
 
     guarded(grant) do
       Grant.transaction do
-        entries = AccessChange.track(users: affected_users(subject), apps: [ app ]) do
+        entries = AccessChange.track(users: affected_users(subject), apps: [ app ], channels: [ grant.channel ]) do
           AppAdminGuard.protect(app) { grant.save! }
         end
         record(action, grant, role_before, label(role), entries)
@@ -41,8 +42,8 @@ class GrantChange
   end
 
   # Multiple-roles apps: one more role for the subject (see above). An existing identical grant is returned as is.
-  def self.add(app:, subject:, role:)
-    existing = Grant.where(app: app, subject: subject).includes(:app_role).to_a
+  def self.add(app:, subject:, role:, channel: "web")
+    existing = Grant.where(app: app, subject: subject, channel: channel.to_s).includes(:app_role).to_a
     if role.nil?
       return existing.first if existing.one? && existing.first.no_access?
       replaced = existing
@@ -50,13 +51,13 @@ class GrantChange
       same = existing.detect { _1.app_role_id == role.id } and return same
       replaced = existing.select(&:no_access?)
     end
-    grant = Grant.new(app: app, subject: subject, app_role: role)
+    grant = Grant.new(app: app, subject: subject, app_role: role, channel: channel.to_s)
     grant.replacing_ids = replaced.map(&:id)
     return grant unless grant.valid?
 
     guarded(grant) do
       Grant.transaction do
-        entries = AccessChange.track(users: affected_users(subject), apps: [ app ]) do
+        entries = AccessChange.track(users: affected_users(subject), apps: [ app ], channels: [ grant.channel ]) do
           AppAdminGuard.protect(app) do
             replaced.each(&:destroy!)
             grant.save!
@@ -73,7 +74,7 @@ class GrantChange
         role_before = label(grant.app_role)
         # A fresh copy: the caller's object may come from an earlier attempt that was refused and rolled back.
         target = Grant.find(grant.id)
-        entries = AccessChange.track(users: affected_users(grant.subject), apps: [ grant.app ]) do
+        entries = AccessChange.track(users: affected_users(grant.subject), apps: [ grant.app ], channels: [ grant.channel ]) do
           AppAdminGuard.protect(grant.app) { target.destroy! }
         end
         record("grant.removed", grant, role_before, nil, entries)
@@ -96,7 +97,7 @@ class GrantChange
   end
 
   def self.record(action, grant, role_before, role_after, entries, replaced: [])
-    data = { subject: subject_label(grant.subject), role_before: role_before, role_after: role_after,
+    data = { subject: subject_label(grant.subject), channel: grant.channel, role_before: role_before, role_after: role_after,
              users: AccessChange.audit_data(entries) }
     data[:replaced] = replaced if replaced.any?
     AuditEvent.record(action, subject: grant.subject, app: grant.app, data: data)

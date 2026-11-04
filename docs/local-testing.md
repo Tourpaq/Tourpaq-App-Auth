@@ -179,7 +179,8 @@ Tick these off. The automated run on 17 Oct 2026 passed all of them (the report 
 **Personal tokens** (http://index.localhost:3050/tokens)
 
 - [ ] Create a token for each app (the Dashboard offers `public`/`all`, the others `read`/`read_write`). It is
-      shown once.
+      shown once. Since SPECS.md §25 the Logs Analyzer and KPI are reached through the MCP Gateway and no longer offer
+      tokens of their own (tokens made earlier still work); try their API with one made before, or skip them.
 - [ ] Call the app with it. Put the token in a shell variable first, so it does not end up in your shell history:
       `read -s T` and paste it.
 
@@ -194,6 +195,26 @@ Tick these off. The automated run on 17 Oct 2026 passed all of them (the report 
 
 - [ ] Call another app with the same token. You get **401**.
 - [ ] Revoke the token on the Tokens page. Within a minute (the introspection cache), the app refuses it.
+
+**The MCP Gateway** (http://localhost:3070/mcp, SPECS.md §25; run on 4 Nov 2026 with `STACK_APPS="logs kpi mcp" bin/dev-stack up`)
+
+- [ ] As mwi, the Tokens page offers **MCP Gateway** and IRM / Azure Cost, but not the Logs Analyzer or KPI (they are
+      reached through the gateway). Create a gateway token (`tpa_mcp_…`) and put it in `T` as above.
+- [ ] List and call the tools through the gateway: the Logs Analyzer's as `logs_…`, KPI's as `kpi_…` (a `read` token
+      hides `record_analysis` and `set_goal`), or one app's only at `/mcp/logs`, `/mcp/kpi`.
+
+      ```sh
+      curl -H "Authorization: Bearer $T" -H 'Content-Type: application/json' \
+           -d '{"jsonrpc":"2.0","id":1,"method":"tools/list"}' http://localhost:3070/mcp
+      curl -H "Authorization: Bearer $T" -H 'Content-Type: application/json' \
+           -d '{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"logs_describe_data","arguments":{}}}' http://localhost:3070/mcp
+      ```
+
+- [ ] In admin.localhost → Users → a person: give **KPI / MCP editor** only (no web grant). They cannot sign in to
+      KPI, but their gateway token lists `kpi_add_annotation`, and an annotation they add is recorded under their name.
+- [ ] Set **MCP Gateway / MCP no access** on them: within a minute the gateway refuses their token.
+- [ ] Audit: `token.exchanged` per app in admin → Audit log; the gateway's own log of tool calls is its `tool_calls`
+      table.
 
 **The index** (http://index.localhost:3050)
 

@@ -13,7 +13,7 @@ class Admin::GroupsController < Admin::BaseController
     @members = @group.users.ordered.to_a
     @non_members = User.active.ordered.where.not(id: @members.map(&:id))
     @apps = App.ordered.includes(:roles).to_a
-    @grants = @group.grants.includes(:app_role).group_by(&:app_id)
+    @grants = @group.grants.includes(:app_role).group_by { [ _1.app_id, _1.channel ] }
   end
 
   def new

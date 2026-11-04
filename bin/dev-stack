@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-# A local test stack: this auth app plus the IRM, KPI, Logs Analyzer, Azure Cost and the Dashboard, all signing in
-# through it, on separate stack databases (docs/local-testing.md is the walkthrough).
+# A local test stack: this auth app plus the IRM, KPI, Logs Analyzer, Azure Cost, the Dashboard and the MCP Gateway,
+# all signing in through it (the gateway introspects and exchanges tokens with it, in front of the Logs Analyzer's and
+# KPI's MCP servers), on separate stack databases (docs/local-testing.md is the walkthrough).
 #
 #   bin/dev-stack                     prepare (the default): the auth app's stack database (migrated and seeded), a
 #                                     client secret per app, .env.auth-local in every app, the apps' stack databases;
@@ -10,7 +11,7 @@
 #                                     Dashboard's permission catalogue, and wait until everything answers
 #   bin/dev-stack down                stop the containers bin/dev-stack started (stack-auth, stack-irm, …)
 #   bin/dev-stack status              which stack containers run, with their URLs
-#   bin/dev-stack logs <name>         follow one container's log (auth, irm, kpi, logs, azure-cost, home)
+#   bin/dev-stack logs <name>         follow one container's log (auth, irm, kpi, logs, azure-cost, home, mcp)
 #   bin/dev-stack dashboard-import    (again) put sample pre-cutover access data into the Dashboard's stack database,
 #                                     export it with the Dashboard's own export, import it here (dry run, APPLY=1)
 #                                     and run the Dashboard's auth:verify_import (needs the auth app running)
@@ -28,11 +29,11 @@
 # the auth app's back-channel at http://host.docker.internal:3050 (AUTH_INTERNAL_HOSTS / LOGIN_INTERNAL_URL).
 #
 # Settings (environment):
-#   IRM_PORT=3030 KPI_PORT=3040 LOGS_PORT=3020 AZURE_COST_PORT=3010 DASHBOARD_PORT=4013
+#   IRM_PORT=3030 KPI_PORT=3040 LOGS_PORT=3020 AZURE_COST_PORT=3010 DASHBOARD_PORT=4013 MCP_PORT=3070
 #                                     host ports; a port other than the default is added to the client's redirect URIs
 #                                     in the stack database (audited client.updated)
 #   STACK_ACCESS_CACHE_SECONDS=30     the apps' LOGIN_ACCESS_CACHE_SECONDS: how soon a removed grant ends a session
-#   STACK_APPS="irm kpi …"            the apps to prepare (default: all five)
+#   STACK_APPS="irm kpi …"            the apps to prepare (default: all six)
 #   CODE_DIR=..                       where the app repositories are (default: next to this one)
 set -euo pipefail
 
@@ -42,7 +43,7 @@ ENV_NAME=".env.auth-local"
 STATE_DIR="$AUTH_DIR/tmp/dev-stack"
 ISSUER="http://auth.localhost:3050"
 INTERNAL_URL="http://host.docker.internal:3050"
-ALL_APPS="irm kpi logs azure-cost home"
+ALL_APPS="irm kpi logs azure-cost home mcp"
 APPS="${STACK_APPS:-$ALL_APPS}"
 CACHE_SECONDS="${STACK_ACCESS_CACHE_SECONDS:-30}"
 
@@ -55,6 +56,7 @@ app_dir() {
     logs) echo "$CODE_DIR/Tourpaq-App-Logs-Analyzer" ;;
     azure-cost) echo "$CODE_DIR/Tourpaq-App-Azure-Cost" ;;
     home) echo "$CODE_DIR/Tourpaq-App-Home" ;;
+    mcp) echo "$CODE_DIR/Tourpaq-App-MCP-Gateway" ;;
     *) echo "unknown app $1 (one of: $ALL_APPS)" >&2; exit 64 ;;
   esac
 }
@@ -63,7 +65,7 @@ app_client() { echo "$1-web"; }
 
 # The port inside the container (each app's dev port, which its bin/docker-dev publishes).
 app_inner_port() {
-  case "$1" in irm) echo 3030 ;; kpi) echo 3040 ;; logs) echo 3020 ;; azure-cost) echo 3010 ;; home) echo 4013 ;; esac
+  case "$1" in irm) echo 3030 ;; kpi) echo 3040 ;; logs) echo 3020 ;; azure-cost) echo 3010 ;; home) echo 4013 ;; mcp) echo 3070 ;; esac
 }
 
 # The port on this machine (WEB_PORT of bin/docker-dev).
@@ -74,11 +76,12 @@ app_port() {
     logs) echo "${LOGS_PORT:-3020}" ;;
     azure-cost) echo "${AZURE_COST_PORT:-3010}" ;;
     home) echo "${HOME_PORT:-${DASHBOARD_PORT:-4013}}" ;;
+    mcp) echo "${MCP_PORT:-3070}" ;;
   esac
 }
 
 app_title() {
-  case "$1" in irm) echo "IRM" ;; kpi) echo "KPI" ;; logs) echo "Logs Analyzer" ;; azure-cost) echo "Azure Cost" ;; home) echo "Home" ;; esac
+  case "$1" in irm) echo "IRM" ;; kpi) echo "KPI" ;; logs) echo "Logs Analyzer" ;; azure-cost) echo "Azure Cost" ;; home) echo "Home" ;; mcp) echo "MCP Gateway" ;; esac
 }
 
 container() { echo "stack-$1"; }
@@ -170,6 +173,13 @@ write_app_env() { # $1 = app, $2 = secret
         say "AUTH_ENTRA_CALLBACK_URL=$ISSUER/auth/entra_id/callback"
         say "AUTH_ADMIN_URL=http://admin.localhost:3050"
         say "AUTH_INDEX_URL=http://index.localhost:3050" ;;
+      mcp)
+        say "DATABASE_URL=sqlite3:storage/stack.sqlite3"
+        say "# The MCP servers behind the gateway, on the stack's ports (the auth app's SPECS.md §25)."
+        say "LOGS_MCP_URL=http://host.docker.internal:$(app_port logs)/mcp"
+        say "KPI_MCP_URL=http://host.docker.internal:$(app_port kpi)/mcp"
+        say "TOKENS_URL=http://index.localhost:3050/tokens"
+        say "ALLOWED_HOSTS=" ;;
     esac
   } >"$file.new"
   mv "$file.new" "$file"

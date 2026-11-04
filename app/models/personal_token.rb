@@ -9,6 +9,9 @@
 #   token.revoke!(actor:)
 #
 # Tokens are not deleted when access is lost: they are refused while the user has no access (§6).
+#
+# A token of the MCP Gateway app (tpa_mcp_…, §25) follows the user's MCP-channel access (App#token_channel); every
+# other app's follows the web channel. Only a gateway token can be exchanged for an app's short-lived tpe_ token.
 class PersonalToken < ApplicationRecord
   include HashedToken
 
@@ -23,6 +26,7 @@ class PersonalToken < ApplicationRecord
   belongs_to :user
   belongs_to :app
   belongs_to :revoked_by, class_name: "User", optional: true
+  has_many :exchanged_tokens, dependent: :delete_all
 
   normalizes :name, with: ->(name) { name.to_s.strip }
 
@@ -38,6 +42,14 @@ class PersonalToken < ApplicationRecord
   scope :recent_first, -> { order(created_at: :desc) }
 
   def self.prefix_for(app) = "#{PREFIX}#{app.slug}_"
+
+  # The apps the Tokens page offers a user (§9.1, §25.4): the MCP Gateway while they have MCP access to something,
+  # and the apps they have a web role in that are not reached through the gateway (an app with the MCP channel gets
+  # its MCP use through one gateway token, so it no longer offers its own). Gateways first, then by name.
+  def self.offered_apps(user)
+    gateways = App.active.gateways.ordered.select { EffectiveRole.for(user, _1, channel: "mcp").access? }
+    gateways + EffectiveRole.apps_for(user).map(&:app).reject { _1.mcp_channel? || _1.gateway? }
+  end
 
   # Creates the token and returns the plain value (shown once). Raises ActiveRecord::RecordInvalid
   # on a bad name/scope/lifetime, no access to the app, or MAX_ACTIVE reached.
@@ -74,7 +86,8 @@ class PersonalToken < ApplicationRecord
   # The app's highest scope (read_write, the Dashboard's all): shown as "may change things / see everything".
   def highest_scope? = app.present? && scope == app.highest_token_scope && app.token_scopes.size > 1
 
-  def effective_role = EffectiveRole.for(user, app)
+  def effective_role = EffectiveRole.for(user, app, channel: app.token_channel)
+  def gateway? = app.gateway?
 
   # Valid right now: active, the user and app are active, and the user has a role in the app.
   def usable? = active? && effective_role.access?
@@ -83,6 +96,7 @@ class PersonalToken < ApplicationRecord
     return false if revoked?
     transaction do
       update!(revoked_at: Time.current, revoked_by: actor)
+      exchanged_tokens.delete_all # refused anyway once this token is; gone at once
       AuditEvent.record("token.revoked", subject: self, actor: actor, data: { user_id: user_id, app: app.slug, name: name, hint: token_hint })
     end
     true
@@ -104,7 +118,7 @@ class PersonalToken < ApplicationRecord
     errors.add(:lifetime_days, "must be one of #{LIFETIMES.to_sentence(last_word_connector: ' or ')} days") if lifetime_days && !LIFETIMES.include?(lifetime_days)
     return unless user && app
     errors.add(:base, "#{user.display_name} is disabled") if user.disabled?
-    errors.add(:app, "is not one you have access to") unless EffectiveRole.for(user, app).access?
+    errors.add(:app, "is not one you have access to") unless EffectiveRole.for(user, app, channel: app.token_channel).access?
     errors.add(:base, "You can hold at most #{MAX_ACTIVE} active tokens: revoke one first") if user.personal_tokens.active.count >= MAX_ACTIVE
   end
 end

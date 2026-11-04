@@ -7,6 +7,7 @@
 #   profile and the admin pages do not list them as live; ended sessions go after 30 days;
 # - OAuth tokens of users who lost access to the app are revoked (AccessRevocation, §6);
 #   expired or revoked OAuth tokens go after 30 days;
+# - exchanged tokens (the MCP Gateway's, 5 minutes, §25.5) an hour after they expired;
 # - usage counts (per client and day) after 400 days.
 class CleanupJob < ApplicationJob
   KEEP_ENDED_SESSIONS = 30.days
@@ -23,6 +24,7 @@ class CleanupJob < ApplicationJob
       dead = OauthToken.where(expires_at: ...KEEP_DEAD_OAUTH_TOKENS.ago).or(OauthToken.where(revoked_at: ...KEEP_DEAD_OAUTH_TOKENS.ago))
       OauthToken.where(replaced_by_id: dead.select(:id)).update_all(replaced_by_id: nil)
       dead.delete_all
+      ExchangedToken.where(expires_at: ...ExchangedToken::KEEP_EXPIRED.ago).delete_all
       UsageCount.where(day: ...KEEP_USAGE_COUNTS.ago.to_date).delete_all
     end
   end

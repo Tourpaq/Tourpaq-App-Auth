@@ -2,11 +2,16 @@
 <h1>API and MCP tokens</h1>
 <p class="muted">A personal token lets a script, Claude Code or an MCP client use one app as you. It can never do more
   than your role in that app allows, and it stops working while you have no access.</p>
+<% if (gateway = @apps.detect(&:gateway?)) %>
+  <p class="muted">For Claude and other MCP clients, create one token for <strong><%= gateway.name %></strong>: it gives you
+    every MCP tool you have access to<%= gateway.url.present? ? safe_join([ " at ", tag.span("#{gateway.url.chomp('/')}/mcp", class: "mono") ]) : "" %>.
+    Apps reached through it no longer have tokens of their own.</p>
+<% end %>
 
 <div class="card">
   <h2>New token</h2>
   <% if @apps.empty? %>
-    <p class="empty">You have no access to any app yet, so there is nothing to create a token for.</p>
+    <p class="empty">You have no access to any app that offers tokens yet: no MCP access, and no web access to an app with tokens of its own.</p>
   <% elsif @active_count >= PersonalToken::MAX_ACTIVE %>
     <p class="empty">You hold <%= PersonalToken::MAX_ACTIVE %> active tokens, the most allowed. Revoke one first.</p>
   <% else %>

@@ -6,7 +6,10 @@
     <% if @app.description.present? %><p class="muted"><%= @app.description %></p><% end %>
   </div>
   <div class="actions">
-    <%= link_to "Members (#{@member_count})", members_admin_app_path(@app), class: "btn-secondary" %>
+    <% @app.channels.each do |channel| %>
+      <%= link_to "#{@app.channels.size > 1 ? "#{App.channel_label(channel)} members" : 'Members'} (#{@member_counts[channel]})",
+            members_admin_app_path(@app, channel: channel), class: "btn-secondary" %>
+    <% end %>
     <%= link_to "Edit", edit_admin_app_path(@app), class: "btn-secondary" %>
   </div>
 </div>
@@ -16,6 +19,7 @@
     <dt>Slug</dt><dd class="mono"><%= @app.slug %></dd>
     <dt>Role claim</dt><dd class="mono"><%= @app.role_claim %></dd>
     <dt>URL</dt><dd class="mono"><%= @app.url.presence || tag.span("—", class: "muted") %></dd>
+    <dt>Channels</dt><dd><%= channel_pills(@app) %><% if @app.gateway? %> <span class="pill pill-warn">MCP Gateway</span> <span class="muted small">access follows the MCP access to the other apps; a direct grant overrides it</span><% end %></dd>
     <dt>Launcher</dt><dd><%= @app.show_in_launcher? ? "shown" : "hidden" %></dd>
     <dt>State</dt><dd><%= @app.disabled? ? tag.span("disabled", class: "pill pill-bad") : tag.span("active", class: "pill pill-ok") %></dd>
     <dt>Personal tokens</dt><dd><%= link_to pluralize(@token_count, "active token"), admin_tokens_path(app_id: @app.id) %></dd>
@@ -241,7 +245,7 @@
 <% if @grants.any? %>
   <div class="table-wrap">
     <table>
-      <thead><tr><th>To</th><th>Role</th></tr></thead>
+      <thead><tr><th>To</th><th>Channel</th><th>Role</th></tr></thead>
       <tbody>
         <% @grants.each do |grant| %>
           <tr>
@@ -252,6 +256,7 @@
                 <%= link_to grant.subject.display_name, admin_user_path(grant.subject) %> <span class="muted small">direct</span>
               <% end %>
             </td>
+            <td><%= channel_pill(grant.channel) %></td>
             <td><%= role_badge(grant.app_role) %></td>
           </tr>
         <% end %>

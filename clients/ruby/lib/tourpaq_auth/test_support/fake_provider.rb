@@ -138,12 +138,14 @@ module TourpaqAuth
 
       # --- tokens (SPECS.md §9, §10) -----------------------------------------------------------------
 
-      # Issues a personal (tpa_) or extension (tpx_) token for this app; returns the token.
+      # Issues a personal (tpa_), extension (tpx_) or exchanged (tpe_, what the MCP Gateway gets for this app by the
+      # token exchange, the auth app's SPECS.md §25.5) token for this app; returns the token.
       # scope: one of token_scopes (default its lowest); an extension token gets the highest, as the auth app gives it.
-      def issue_token(sub:, scope: nil, token_type: "personal", expires_in: 90 * 86_400, name: "Test token", app: self.app)
+      def issue_token(sub:, scope: nil, token_type: "personal", expires_in: nil, name: "Test token", app: self.app)
         scope ||= token_type == "extension" ? token_scopes.last : token_scopes.first
         raise ArgumentError, "scope #{scope.inspect} is not one of #{token_scopes.inspect}" unless token_scopes.include?(scope)
-        prefix = token_type == "extension" ? "tpx" : "tpa"
+        expires_in ||= token_type == "exchanged" ? 300 : 90 * 86_400
+        prefix = { "extension" => "tpx", "exchanged" => "tpe" }.fetch(token_type, "tpa")
         token = "#{prefix}_#{app}_#{SecureRandom.urlsafe_base64(32)}"
         @tokens[token] = { "sub" => sub, "scope" => scope, "token_type" => token_type, "app" => app, "token_name" => name,
                            "exp" => TourpaqAuth.now.to_i + expires_in, "revoked" => false }

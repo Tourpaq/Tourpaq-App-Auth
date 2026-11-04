@@ -33,7 +33,18 @@
 #   EffectiveRole.permissions_for(user, app)  # [[key, [Held …]]] (result.permission_sources)
 #
 # This is what the ID token, the access API and token introspection report.
+#
+# Channels (§25): every method takes channel: "web" (the default: sign-in, the ID token, the access API, an app's own
+# personal tokens) or "mcp" (through the MCP Gateway). The rules above apply to each channel's grants on their own,
+# and an app without the channel gives nobody access on it. The gateway app (App#gateway?) is derived: on the MCP
+# channel a user has its lowest role (source "MCP access") while they hold an MCP role in at least one other active
+# app, unless a direct grant on the gateway says otherwise (a direct "no access" is the switch for one person).
+#
+#   EffectiveRole.for(user, app, channel: "mcp")
+#   EffectiveRole.apps_for(user, channel: "mcp")
+#   EffectiveRole.mcp_backends_for(user)   # [Result] in the apps behind the gateway, by slug (introspection's mcp_access)
 class EffectiveRole
+  DERIVED_SOURCE = "MCP access".freeze
   # A role the user holds and where it comes from ("direct" first, then group names).
   Held = Data.define(:role, :sources) do
     def key = role.key
@@ -43,7 +54,9 @@ class EffectiveRole
     def sources_text = sources.map { _1 == "direct" ? "direct" : "from #{_1}" }.join(", ")
   end
 
-  Result = Data.define(:user, :app, :role, :source, :group, :held) do
+  Result = Data.define(:user, :app, :role, :source, :group, :held, :channel) do
+    def initialize(channel: "web", **fields) = super(channel: channel, **fields)
+
     def multiple? = app&.multiple_roles? || false
     def access? = multiple? ? held.any? : !role.nil?
     def role_key = role&.key
@@ -81,35 +94,48 @@ class EffectiveRole
   end
 
   class << self
-    def for(user, app)
-      return none(user, app) if user.nil? || app.nil? || user.disabled? || app.disabled?
-      direct = Grant.for_users.includes(:app_role).where(app_id: app.id, subject_id: user.id).to_a
-      group_grants = Grant.for_groups.where(app_id: app.id, subject_id: user.group_memberships.select(:group_id))
+    def for(user, app, channel: "web")
+      channel = channel.to_s
+      return none(user, app, channel) if user.nil? || app.nil? || user.disabled? || app.disabled? || !app.channel?(channel)
+      direct = Grant.for_users.on(channel).includes(:app_role).where(app_id: app.id, subject_id: user.id).to_a
+      group_grants = Grant.for_groups.on(channel).where(app_id: app.id, subject_id: user.group_memberships.select(:group_id))
                           .includes(:app_role, :subject).to_a
-      resolve(user, app, direct, group_grants)
+      resolve(user, app, direct, group_grants, channel)
     end
 
-    def roles_for(user, app) = self.for(user, app).held
-    def permissions_for(user, app) = self.for(user, app).permission_sources
+    def roles_for(user, app, channel: "web") = self.for(user, app, channel: channel).held
+    def permissions_for(user, app, channel: "web") = self.for(user, app, channel: channel).permission_sources
 
-    # Every active app the user has a role in.
-    def apps_for(user)
+    # Every active app the user has a role in on the channel.
+    def apps_for(user, channel: "web")
+      channel = channel.to_s
       return [] if user.nil? || user.disabled?
-      apps = App.active.ordered.includes(:roles).to_a
-      direct = Grant.for_users.where(subject_id: user.id).includes(:app_role).group_by(&:app_id)
-      by_app = Grant.for_groups.where(subject_id: user.group_memberships.select(:group_id))
+      apps = App.active.with_channel(channel).ordered.includes(:roles).to_a
+      direct = Grant.for_users.on(channel).where(subject_id: user.id).includes(:app_role).group_by(&:app_id)
+      by_app = Grant.for_groups.on(channel).where(subject_id: user.group_memberships.select(:group_id))
                     .includes(:app_role, :subject).group_by(&:app_id)
 
-      apps.filter_map do |app|
-        r = resolve(user, app, direct.fetch(app.id, []), by_app.fetch(app.id, []))
+      results = apps.reject(&:gateway?).filter_map do |app|
+        r = resolve(user, app, direct.fetch(app.id, []), by_app.fetch(app.id, []), channel)
         r if r.access?
       end
+      gateways = apps.select(&:gateway?).filter_map do |app|
+        r = resolve(user, app, direct.fetch(app.id, []), by_app.fetch(app.id, []), channel, backends: results)
+        r if r.access?
+      end
+      (results + gateways).sort_by { [ _1.app.name, _1.app.id ] }
     end
 
-    # Every active user with a role in the app.
-    def members_of(app)
-      return [] if app.nil? || app.disabled?
-      grants = app.grants.includes(:app_role, :subject).to_a
+    # The apps behind the MCP Gateway the user has an MCP role in, sorted by slug: what introspecting a gateway
+    # token reports as mcp_access (§25.3).
+    def mcp_backends_for(user) = apps_for(user, channel: "mcp").reject { _1.app.gateway? }.sort_by { _1.app.slug }
+
+    # Every active user with a role in the app on the channel.
+    def members_of(app, channel: "web")
+      channel = channel.to_s
+      return [] if app.nil? || app.disabled? || !app.channel?(channel)
+      return User.active.ordered.map { self.for(_1, app, channel: channel) }.select(&:access?) if app.gateway?
+      grants = app.grants.on(channel).includes(:app_role, :subject).to_a
       direct = grants.select { _1.subject_type == "User" }.group_by(&:subject_id)
       group_grants = grants.select { _1.subject_type == "Group" }.group_by(&:subject_id)
       memberships = GroupMembership.where(group_id: group_grants.keys).pluck(:user_id, :group_id)
@@ -118,36 +144,42 @@ class EffectiveRole
       user_ids = (direct.select { |_, list| list.any?(&:app_role_id) }.keys + memberships.keys).uniq
       User.active.where(id: user_ids).ordered.filter_map do |user|
         from_groups = memberships.fetch(user.id, []).flat_map { group_grants.fetch(_1, []) }
-        r = resolve(user, app, direct.fetch(user.id, []), from_groups)
+        r = resolve(user, app, direct.fetch(user.id, []), from_groups, channel)
         r if r.access?
       end
     end
 
     private
 
-    # direct: the user's own grants in the app; group_grants: the grants to the user's groups in the app.
-    def resolve(user, app, direct, group_grants)
-      return none(user, app) if user.disabled? || app.disabled?
-      app.multiple_roles? ? resolve_multiple(user, app, direct, group_grants) : resolve_single(user, app, direct, group_grants)
+    # direct: the user's own grants in the app on the channel; group_grants: the grants to the user's groups.
+    # backends: for a gateway app, the user's MCP results elsewhere when the caller has them already.
+    def resolve(user, app, direct, group_grants, channel, backends: nil)
+      return none(user, app, channel) if user.disabled? || app.disabled? || !app.channel?(channel)
+      return resolve_multiple(user, app, direct, group_grants, channel) if app.multiple_roles?
+      resolved = resolve_single(user, app, direct, group_grants, channel)
+      return resolved unless app.gateway? && channel == "mcp" && resolved.source.nil?
+      # Nothing granted on the gateway itself: derived from the MCP roles in the apps behind it.
+      backends ||= apps_for(user, channel: "mcp").reject { _1.app.gateway? }
+      backends.any? && app.lowest_role ? result(user, app, app.lowest_role, DERIVED_SOURCE, nil, channel) : resolved
     end
 
-    def resolve_single(user, app, direct, group_grants)
+    def resolve_single(user, app, direct, group_grants, channel)
       if (grant = direct.first)
-        result(user, app, grant.app_role, "direct", nil)
+        result(user, app, grant.app_role, "direct", nil, channel)
       elsif (best = highest(group_grants))
-        result(user, app, best.app_role, best.subject.name, best.subject)
+        result(user, app, best.app_role, best.subject.name, best.subject, channel)
       else
-        none(user, app)
+        none(user, app, channel)
       end
     end
 
-    def resolve_multiple(user, app, direct, group_grants)
-      return result(user, app, nil, "direct", nil, held: []) if direct.any?(&:no_access?)
+    def resolve_multiple(user, app, direct, group_grants, channel)
+      return result(user, app, nil, "direct", nil, channel, held: []) if direct.any?(&:no_access?)
       sources = Hash.new { |hash, role| hash[role] = [] }
       direct.each { sources[_1.app_role] << "direct" }
       group_grants.select(&:app_role).sort_by { _1.subject.name.downcase }.each { sources[_1.app_role] << _1.subject.name }
       held = sources.map { |role, from| Held.new(role: role, sources: from.uniq) }.sort_by { [ _1.key.downcase, _1.key ] }
-      result(user, app, nil, nil, nil, held: held)
+      result(user, app, nil, nil, nil, channel, held: held)
     end
 
     # The group grant with the highest role position; ties go to the group name that sorts first.
@@ -155,11 +187,11 @@ class EffectiveRole
       group_grants.compact.select(&:app_role).min_by { |g| [ -g.app_role.position, g.subject.name.downcase ] }
     end
 
-    def result(user, app, role, source, group, held: nil)
+    def result(user, app, role, source, group, channel, held: nil)
       held ||= role ? [ Held.new(role: role, sources: [ source ]) ] : []
-      Result.new(user: user, app: app, role: role, source: source, group: group, held: held)
+      Result.new(user: user, app: app, role: role, source: source, group: group, held: held, channel: channel)
     end
 
-    def none(user, app) = result(user, app, nil, nil, nil)
+    def none(user, app, channel = "web") = result(user, app, nil, nil, nil, channel)
   end
 end

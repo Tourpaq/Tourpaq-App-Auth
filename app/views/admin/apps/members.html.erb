@@ -1,8 +1,11 @@
 <% content_for :title, "#{@app.name} members" %>
 <p class="breadcrumb"><%= link_to "Apps", admin_apps_path %> / <%= link_to @app.name, admin_app_path(@app) %></p>
-<h1><%= @app.name %> members</h1>
-<p class="muted">Everyone with access to <%= @app.name %>, with their effective <%= @app.multiple_roles? ? "roles, permissions" : "role" %> and where
-  <%= @app.multiple_roles? ? "they come" : "it comes" %> from. This is what the ID token and the access API report.</p>
+<h1><%= @app.name %> members<% if @app.channels.size > 1 || @channel != "web" %> <%= channel_pill(@channel) %><% end %></h1>
+<% if @app.channels.size > 1 %>
+  <p><% @app.channels.each do |channel| %><%= link_to_unless channel == @channel, "#{App.channel_label(channel)} members", members_admin_app_path(@app, channel: channel) %> <% end %></p>
+<% end %>
+<p class="muted">Everyone with access to <%= @app.name %><%= @channel == "mcp" ? " through the MCP Gateway" : "" %>, with their effective <%= @app.multiple_roles? ? "roles, permissions" : "role" %> and where
+  <%= @app.multiple_roles? ? "they come" : "it comes" %> from. <%= @channel == "mcp" ? "This is what the app learns from a token the gateway exchanged." : "This is what the ID token and the access API report." %></p>
 <% if @members.any? %>
   <div class="table-wrap">
     <table>
@@ -26,7 +29,7 @@
               <td><%= link_to access.user.display_name, admin_user_path(access.user) %></td>
               <td><%= access.user.email %></td>
               <td><%= role_badge(access) %></td>
-              <td><%= access.direct? ? "direct" : link_to("group #{access.source}", admin_group_path(access.group)) %></td>
+              <td><%= access.direct? ? "direct" : access.group ? link_to("group #{access.source}", admin_group_path(access.group)) : access.source %></td>
             </tr>
           <% end %>
         </tbody>
