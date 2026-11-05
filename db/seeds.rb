@@ -75,13 +75,29 @@ apps = [
   { slug: "mcp", name: "MCP Gateway", description: "One MCP endpoint and one token for Claude: every MCP tool you have access to.",
     icon: "logs", url: "https://mcp.app.journeybooking.eu", dev_port: 3070, web_channel: false, mcp: true, gateway: true,
     show_in_launcher: false, roles: [ [ "user", "Uses the MCP tools of the apps they have MCP access to" ] ], redirect_uris: [] },
-  # Data sources the gateway reaches with its own read-only credentials (MCP only, no client of their own).
-  { slug: "staging-sql", name: "Staging SQL Server", description: "Read-only SQL on the staging databases, through the MCP Gateway.",
+  # Data sources the gateway reaches with its own read-only credentials (MCP only, no client of their own): the read
+  # replicas of the booking databases, one app per environment so access is granted per environment (§25.6).
+  { slug: "replica-bravo", name: "SQL Replica Bravo", description: "Read-only SQL on the Bravo read replica, through the MCP Gateway.",
+    icon: "logs", web: false, web_channel: false, mcp: true, show_in_launcher: false,
+    roles: [ [ "viewer", "Runs read-only queries" ], [ "admin", "Manages the source" ] ] },
+  { slug: "replica-x", name: "SQL Replica X", description: "Read-only SQL on the X read replica, through the MCP Gateway.",
+    icon: "logs", web: false, web_channel: false, mcp: true, show_in_launcher: false,
+    roles: [ [ "viewer", "Runs read-only queries" ], [ "admin", "Manages the source" ] ] },
+  { slug: "replica-staging", name: "SQL Replica Staging", description: "Read-only SQL on the staging read replica, through the MCP Gateway.",
     icon: "logs", web: false, web_channel: false, mcp: true, show_in_launcher: false,
     roles: [ [ "viewer", "Runs read-only queries" ], [ "admin", "Manages the source" ] ] },
   { slug: "eo2-bravo", name: "EO2 Bravo", description: "Bravo's live EO2 Offers API (searches only), through the MCP Gateway.",
     icon: "logs", web: false, web_channel: false, mcp: true, show_in_launcher: false,
-    roles: [ [ "viewer", "Asks EO2 for offers" ], [ "admin", "Manages the source" ] ] }
+    roles: [ [ "viewer", "Asks EO2 for offers" ], [ "admin", "Manages the source" ] ] },
+  # Coolify's application and deployment logs, read only (§25.6).
+  { slug: "coolify-logs", name: "Coolify logs", description: "The apps' container and deployment logs in Coolify, read only, through the MCP Gateway.",
+    icon: "logs", web: false, web_channel: false, mcp: true, show_in_launcher: false,
+    roles: [ [ "viewer", "Reads the logs" ], [ "admin", "Manages the source" ] ] },
+  # This app's own configuration, read only, through the gateway (§25.7). Its config API also requires User#admin, so
+  # a grant here alone never shows it to anyone else.
+  { slug: "auth-config", name: "Tourpaq Auth configuration", description: "This app's access setup and environment, read only, for its admins, through the MCP Gateway.",
+    icon: "logs", web: false, web_channel: false, mcp: true, show_in_launcher: false,
+    roles: [ [ "admin", "Reads the configuration (Tourpaq Auth admins only)" ] ] }
 ]
 
 apps.each do |spec|

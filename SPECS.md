@@ -1611,20 +1611,24 @@ Several test runs side by side use `TEST_DB=storage/test_<name>.sqlite3 PARALLEL
 
 ---
 
-## 25. MCP access and the MCP Gateway (decided and built 4 Nov 2026)
+## 25. MCP access and the MCP Gateway (decided and built 4 Nov 2026; §25.7 and the replicas 5 Nov 2026)
 
 People use Claude with one token for every Tourpaq MCP tool they may use: the **MCP Gateway**
 (`../Tourpaq-App-MCP-Gateway`, https://mcp.app.journeybooking.eu/mcp) sits in front of the apps' MCP servers (the Logs
-Analyzer, the Offers Validator, KPI, …) and of data sources nobody reaches directly (the staging SQL Server, EO2's live
-Offers API, …). This app decides who reaches which of them, and with which role, separately from who may sign in to
+Analyzer, the Offers Validator, KPI, …) and of data sources nobody reaches directly (the SQL read replicas, EO2's live
+Offers API, Coolify's logs, this app's own configuration, …). This app decides who reaches which of them, and with which role, separately from who may sign in to
 an app on the web. The gateway's own spec (its SPECS.md) covers its side.
 
 ### 25.1 Channels: web and MCP access per app
 
 - An app has **channels**: `web` (sign-in, the ID token, the access API, its own personal tokens) and/or `mcp`
   (reached through the gateway). Columns `apps.web_channel` (default on) and `apps.mcp_channel` (default off); at least
-  one. Seeded: the Logs Analyzer, KPI and the Offers Validator have both; `staging-sql` and `eo2-bravo` only MCP (no
-  client: the gateway reaches them with its own credentials); the other apps only web.
+  one. Seeded: the Logs Analyzer, KPI and the Offers Validator have both; the data sources only MCP (no client: the
+  gateway reaches them with its own credentials): `replica-bravo`, `replica-x`, `replica-staging` (the SQL read
+  replicas, one app per environment so access is granted per environment), `eo2-bravo`, `coolify-logs` and
+  `auth-config` (§25.7); the other apps only web. Migration `RenameStagingSqlAppToReplicaStaging` (5 Nov 2026) renamed
+  the earlier `staging-sql` to `replica-staging` (slug, role claim, seeded name; id, roles and grants kept, audited
+  `app.renamed`) before the seeds run.
 - A grant is for one channel: *(app, user or group, channel) → role* (`grants.channel`, unique per app, subject,
   channel and role). The app must have the channel. The effective role (§5.3) is worked out **per channel on its
   own**: a direct grant wins on its channel, else the highest group role on it, a direct "no access" overrides the
@@ -1661,7 +1665,7 @@ an app on the web. The gateway's own spec (its SPECS.md) covers its side.
   ```json
   "mcp_access": [
     { "app": "logs", "name": "Logs Analyzer", "role": "admin" },
-    { "app": "staging-sql", "name": "Staging SQL Server", "role": "viewer" }
+    { "app": "replica-staging", "name": "SQL Replica Staging", "role": "viewer" }
   ]
   ```
 
@@ -1711,3 +1715,29 @@ tokens are not affected.
   KPI and the gateway; the other apps keep 0.3.1 until they next sync (nothing they use changed).
 - `bin/dev-stack` runs the gateway (port 3070) in front of the Logs Analyzer's and KPI's MCP servers
   (docs/local-testing.md).
+
+### 25.7 The config API: this app's configuration for its admins, through the gateway (5 Nov 2026)
+
+For debugging access ("why can't X see the Bravo replica?"), admins can read this app's access setup from Claude: the
+gateway's `auth_config` backend (its SPECS.md §6c) calls this read-only API with a token exchanged for the app
+`auth-config` (MCP only, one role `admin`, seeded with DK Tech).
+
+```
+GET /api/v1/config                  every app (channels, roles, token scopes, clients), every group, the admins
+GET /api/v1/config/apps/:slug       one app, its grants (group or person, role, channel), its members per channel
+GET /api/v1/config/users/:user      one person by email or sub: account, groups, grants, access per app and channel,
+                                    personal tokens (name, app, scope, created, expires, last used, revoked)
+GET /api/v1/config/groups/:name     one group: members and grants
+GET /api/v1/config/whoami           the caller (the gateway asks before it shows this app's Coolify environment)
+Authorization: Bearer tpe_auth-config_…
+```
+
+- Back-channel hosts only (§24.1), like `/api/v1/access`. `Api::V1::ConfigController`, not the client-authenticated
+  base: the Bearer must be a usable exchanged token for `auth-config` (so an MCP role there), else `401`, **and its
+  person an active admin** (`User#admin`), else `403`. A grant in `auth-config` alone shows nothing to a non-admin;
+  losing admin or the grant stops it at once.
+- **Never a secret**: no client secrets or their hints (a client shows how many active secrets it has, the newest's
+  date, the next expiry and the last use), no token values, digests or hints, no Entra ids. Effective roles come with
+  their source, as in the admin UI.
+- Audited `config.read` (actor the admin, app `auth-config`, the path and the gateway's client) at most once per admin
+  and 5 minutes; rate limited 120 a minute per admin.

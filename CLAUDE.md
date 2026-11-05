@@ -67,6 +67,10 @@ running and deploying.
   (`tpe_<slug>_`, 5 minutes) issued by `Oidc::TokenExchange` (grant type in `Oauth::TokensController`) and answered by
   `Oidc::Introspection#exchanged`. Admin views have a row per (app, channel); `channel_pill` in ApplicationHelper.
   Tests: test/integration/mcp_gateway_test.rb, test/db/add_channels_test.rb.
+- The config API (SPECS.md §25.7): `Api::V1::ConfigController` (`GET /api/v1/config…`, back-channel), Bearer = an
+  exchanged token for `auth-config` **and** `User#admin`; never a secret, hint or digest in its answers. Tests:
+  test/integration/api/config_test.rb. The SQL data sources are `replica-bravo`, `replica-x`, `replica-staging`
+  (migration `RenameStagingSqlAppToReplicaStaging`), plus `coolify-logs`; all seeded MCP only.
 - `app/services/effective_role.rb`: §5.3 — `EffectiveRole.for(user, app)`, `.apps_for(user)`, `.members_of(app)`,
   results with `role`, `role_key`, `source` ("direct" or the group's name), `to_s` ("responder, from RO Dev"); for a
   multiple-roles app (§23.2) `held` (roles with sources), `role_keys`, `permissions`, `permission_sources`,

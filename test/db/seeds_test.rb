@@ -43,13 +43,15 @@ class SeedsTest < ActiveSupport::TestCase
     # Channels and the MCP Gateway (§25): the apps whose MCP servers sit behind the gateway, the gateway itself (MCP
     # only, access derived) with its client, and the data sources it reaches (MCP only, no client).
     assert_equal %w[kpi logs offers-validator], App.where(web_channel: true, mcp_channel: true).order(:slug).pluck(:slug)
-    assert_equal %w[eo2-bravo mcp staging-sql], App.where(web_channel: false).order(:slug).pluck(:slug)
+    assert_equal %w[auth-config coolify-logs eo2-bravo mcp replica-bravo replica-staging replica-x],
+                 App.where(web_channel: false).order(:slug).pluck(:slug)
+    assert_equal %w[admin], App.find_by!(slug: "auth-config").role_keys
     gateway = App.find_by!(slug: "mcp")
     assert gateway.gateway?
     assert_equal %w[user], gateway.role_keys
     assert_equal "user, from MCP access", EffectiveRole.for(mwi, gateway, channel: "mcp").to_s
     assert_empty Client.find_by!(client_id: "mcp-web").redirect_uris
-    assert_not Client.exists?(client_id: "staging-sql-web")
+    assert_not Client.where(client_id: %w[replica-bravo-web replica-x-web replica-staging-web coolify-logs-web auth-config-web]).exists?
 
     # Home, formerly the Dashboard (§23): multiple roles, no roles yet (its standard roles or the import create them),
     # its scopes and claims, client home-web. It stays at home.app (§24.1).
