@@ -35,6 +35,16 @@ class Index::TokensController < Index::BaseController
     render :index, status: :unprocessable_content
   end
 
+  # The Claude Desktop extension for the MCP Gateway (§25.8). It holds no token (Claude Desktop asks for it when it
+  # is installed), but only people the page offers the gateway get it: 404 for anybody else.
+  def claude_desktop
+    gateway = accessible_apps.detect { _1.gateway? && _1.url.present? }
+    raise ActiveRecord::RecordNotFound, "no MCP Gateway for this user" unless gateway
+
+    extension = ClaudeDesktopExtension.new(gateway)
+    send_data extension.to_zip, filename: extension.filename, type: "application/zip", disposition: "attachment"
+  end
+
   def destroy
     token = current_user.personal_tokens.find(params[:id])
     if token.revoke!(actor: current_user)

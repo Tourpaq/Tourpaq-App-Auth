@@ -249,4 +249,73 @@ class McpGatewayTest < ActionDispatch::IntegrationTest
     get "/apps/#{@logs.id}/members", params: { channel: "mcp" }
     assert_select "td", text: @alice.email
   end
+
+  # --- Claude Code and Claude Desktop (§25.8) ----------------------------------------------------
+
+  # The entries of a zip whose entries are stored (as ClaudeDesktopExtension writes them): { name => content }.
+  def unzip(bytes)
+    entries = {}
+    pos = 0
+    while bytes.byteslice(pos, 4) == "PK\x03\x04".b
+      method, size, name_length, extra_length = bytes.byteslice(pos, 30).unpack("@8v@18V@26vv")
+      assert_equal 0, method, "stored"
+      name = bytes.byteslice(pos + 30, name_length)
+      entries[name] = bytes.byteslice(pos + 30 + name_length + extra_length, size)
+      pos += 30 + name_length + extra_length + size
+    end
+    entries
+  end
+
+  test "a gateway token's page has the Claude Code command with the token and the Claude Desktop download" do
+    @gateway.update!(url: "https://mcp.app.journeybooking.eu")
+    grant(@logs, @alice, "admin", channel: "mcp")
+    sign_in_index @alice
+    get "/tokens"
+    assert_select "a[href='/tokens/claude-desktop']", "download the extension"
+
+    post "/tokens", params: { personal_token: { app_id: @gateway.id, name: "Claude", scope: "read", lifetime_days: 90 } }
+    assert_response :success
+    plain = css_select(".link-box code").text
+    command = "claude mcp add --transport http --scope user tourpaq https://mcp.app.journeybooking.eu/mcp " \
+              "--header \"Authorization: Bearer #{plain}\""
+    assert_select ".command-box pre", command
+    assert_select ".command-box[data-copy-text-value=?]", command
+    assert_select "a[href='/tokens/claude-desktop']", "Download the Claude Desktop extension"
+    assert_select "pre", { text: /curl/, count: 0 }, "no curl line for the gateway"
+  end
+
+  test "the Claude Desktop extension: a .mcpb with the gateway's endpoint, asking for the token, holding none" do
+    @gateway.update!(url: "https://mcp.app.journeybooking.eu/")
+    grant(@sql, @alice, "viewer", channel: "mcp")
+    plain = gateway_token
+    sign_in_index @alice
+    get "/tokens/claude-desktop"
+    assert_response :success
+    assert_equal "application/zip", response.media_type
+    assert_match(/attachment; filename="tourpaq-mcp-gateway\.mcpb"/, response.headers["Content-Disposition"])
+
+    files = unzip(response.body.b)
+    assert_equal [ "manifest.json", "server/index.js" ], files.keys
+    manifest = JSON.parse(files["manifest.json"])
+    assert_equal [ "0.2", "tourpaq-mcp-gateway", "node", "server/index.js" ],
+                 [ manifest["manifest_version"], manifest["name"], manifest.dig("server", "type"), manifest.dig("server", "entry_point") ]
+    assert_equal({ "TOURPAQ_MCP_URL" => "https://mcp.app.journeybooking.eu/mcp", "TOURPAQ_MCP_TOKEN" => "${user_config.token}" },
+                 manifest.dig("server", "mcp_config", "env"))
+    assert_equal [ "string", true, true ], manifest.dig("user_config", "token").values_at("type", "sensitive", "required")
+    assert_includes files["server/index.js"], "TOURPAQ_MCP_TOKEN"
+    assert_not_includes response.body, plain, "the file holds no token"
+    assert_not_includes response.body, plain.first(12)
+
+    get "/tokens/claude-desktop"
+    assert_equal files, unzip(response.body.b), "the same file every time"
+  end
+
+  test "no Claude Desktop extension without MCP access, or while the gateway has no URL" do
+    sign_in_index @alice
+    get "/tokens/claude-desktop"
+    assert_response :not_found
+    grant(@sql, @alice, "viewer", channel: "mcp")
+    get "/tokens/claude-desktop"
+    assert_response :not_found, "the gateway app has no URL"
+  end
 end

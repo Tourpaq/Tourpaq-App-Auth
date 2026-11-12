@@ -32,6 +32,8 @@ constraints(AuthHosts::Index) do
     end
 
     # Tokens (§9.1): personal API/MCP tokens, listed, created (shown once) and revoked here.
+    # The Claude Desktop extension for the MCP Gateway (§25.8): a .mcpb file without a token, for people offered the gateway.
+    get "tokens/claude-desktop" => "tokens#claude_desktop", as: :claude_desktop_extension
     resources :tokens, only: %i[index create destroy]
   end
 end

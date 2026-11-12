@@ -1741,3 +1741,24 @@ Authorization: Bearer tpe_auth-config_…
   their source, as in the admin UI.
 - Audited `config.read` (actor the admin, app `auth-config`, the path and the gateway's client) at most once per admin
   and 5 minutes; rate limited 120 a minute per admin.
+
+### 25.8 Claude Code and Claude Desktop from the Tokens page (12 Nov 2026)
+
+- **Claude Code**: after a gateway token is created (§9.1), the page also shows, once and with a Copy button,
+  `claude mcp add --transport http --scope user tourpaq <gateway url>/mcp --header "Authorization: Bearer tpa_mcp_…"`
+  with the new token in it (`ClaudeDesktopExtension.claude_code_command`). `--scope user`: every project of the person.
+- **Claude Desktop**: `GET /tokens/claude-desktop` on the index host downloads `tourpaq-mcp-gateway.mcpb`, a Claude Desktop
+  extension (MCPB manifest 0.2: `manifest.json` and `server/index.js`, a zip with stored entries, the same bytes on
+  every download). The created page links to it, and the Tokens page links to it while the gateway is offered. It
+  is for people the page offers the gateway (§25.4) while the gateway app has a URL, and is `404` for anybody else.
+- The file holds **no token**: its `user_config.token` (sensitive, required) makes Claude Desktop ask for the
+  `tpa_mcp_…` token on install and keep it in the system keychain. So it is the same for everyone, may be
+  downloaded at any time, and a copy of it gives nothing away.
+- `server/index.js` (`app/services/claude_desktop_extension/bridge.js`) is a bridge with no dependencies, run by the
+  Node.js that ships with Claude Desktop: each JSON-RPC line from Claude Desktop is POSTed to `TOURPAQ_MCP_URL` with
+  `Authorization: Bearer <token>`. The answer (JSON, or the data lines of an SSE answer) goes back as a line. A refusal
+  (no token, gateway unreachable, `401`, `403`, `429`, `503`) becomes an error for the request with the reason and what
+  to do. Claude Desktop runs it on the person's machine, so the gateway stays behind NetBird.
+- Organization-wide connectors in Claude (added once by an admin) need the gateway reachable from Anthropic's
+  servers and an OAuth sign-in. The gateway has neither (NetBird, personal tokens only), so this is not one.
+- Raise `ClaudeDesktopExtension::VERSION` when the bridge or the manifest changes, so Claude Desktop offers the update.

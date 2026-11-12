@@ -11,7 +11,19 @@
     scope: <%= token_scope_label(@token.scope) %> (capped by your <%= @token.app.multiple_roles? ? "permissions" : "role" %>) ·
     expires <%= local_time(@token.expires_at, format: :date) %>
   </p>
-  <% if @token.app.url.present? %>
+  <% if @token.gateway? && @token.app.url.present? %>
+    <h3>Claude Code</h3>
+    <p class="muted">Adds the gateway to Claude Code for all your projects (<code>--scope user</code>). The token is in the command: run it, don't save it.</p>
+    <% command = ClaudeDesktopExtension.claude_code_command(@token.app, @plain) %>
+    <div class="command-box" data-controller="copy" data-copy-text-value="<%= command %>">
+      <pre><%= command %></pre>
+      <button type="button" data-copy-target="button">Copy</button>
+    </div>
+    <h3>Claude Desktop</h3>
+    <p class="muted">Download the extension and open it: Claude Desktop installs it and asks for your token. Paste the token
+      above; Claude Desktop keeps it in your keychain. You need NetBird, as for Claude Code.</p>
+    <p><%= link_to "Download the Claude Desktop extension", index_claude_desktop_extension_path, class: "button" %></p>
+  <% elsif @token.app.url.present? %>
     <h3>Use it</h3>
     <pre>curl -H "Authorization: Bearer <%= @token.token_hint %>…" <%= @token.app.url %>/api/v1/…</pre>
   <% end %>

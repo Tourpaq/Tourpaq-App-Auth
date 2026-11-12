@@ -6,6 +6,10 @@
   <p class="muted">For Claude and other MCP clients, create one token for <strong><%= gateway.name %></strong>: it gives you
     every MCP tool you have access to<%= gateway.url.present? ? safe_join([ " at ", tag.span("#{gateway.url.chomp('/')}/mcp", class: "mono") ]) : "" %>.
     Apps reached through it no longer have tokens of their own.</p>
+  <% if gateway.url.present? %>
+    <p class="muted">Claude Desktop: <%= link_to "download the extension", index_claude_desktop_extension_path %> and open
+      it; it asks for your <%= gateway.name %> token.</p>
+  <% end %>
 <% end %>
 
 <div class="card">

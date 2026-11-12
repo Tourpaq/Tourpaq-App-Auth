@@ -151,6 +151,10 @@ form.button_to { display:inline-block; margin:0; }
 .link-box input, .link-box code { flex:1; min-width:0; font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:13px;
   padding:8px 10px; border:1px solid var(--border); border-radius:6px; background:var(--bg); overflow-x:auto; white-space:nowrap; }
 .link-box button { flex:0 0 auto; }
+.command-box { display:flex; gap:8px; align-items:flex-start; margin:10px 0; }
+.command-box pre { flex:1; min-width:0; margin:0; font-size:13px; padding:8px 10px; border:1px solid var(--border);
+  border-radius:6px; background:var(--bg); white-space:pre-wrap; word-break:break-all; }
+.command-box button { flex:0 0 auto; }
 .once-warning { font-size:13px; color:#7d4e00; background:#fff8c5; border:1px solid #e5d38a; border-radius:6px; padding:8px 12px; }
 
 /* --- Logged-out pages: a centered card ---------------------------------------- */
