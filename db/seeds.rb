@@ -93,6 +93,14 @@ apps = [
   { slug: "coolify-logs", name: "Coolify logs", description: "The apps' container and deployment logs in Coolify, read only, through the MCP Gateway.",
     icon: "logs", web: false, web_channel: false, mcp: true, show_in_launcher: false,
     roles: [ [ "viewer", "Reads the logs" ], [ "admin", "Manages the source" ] ] },
+  # GitBook's MCP server (the gateway's SPECS.md §6d): it does not use this app, so the gateway calls it with its own
+  # GitBook account and applies the roles itself: viewer the read tools, editor and admin also the tools that change
+  # content (with a read_write gateway token).
+  { slug: "gitbook", name: "GitBook", description: "Our GitBook sites and spaces through the MCP Gateway, with the gateway's GitBook account.",
+    icon: "logs", web: false, web_channel: false, mcp: true, show_in_launcher: false,
+    roles: [ [ "viewer", "Reads sites, spaces and pages" ],
+             [ "editor", "Also opens and merges change requests and runs any GitBook API operation" ],
+             [ "admin", "Manages the source (as editor)" ] ] },
   # This app's own configuration, read only, through the gateway (§25.7). Its config API also requires User#admin, so
   # a grant here alone never shows it to anyone else.
   { slug: "auth-config", name: "Tourpaq Auth configuration", description: "This app's access setup and environment, read only, for its admins, through the MCP Gateway.",

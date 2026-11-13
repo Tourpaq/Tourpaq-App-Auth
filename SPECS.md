@@ -1715,6 +1715,10 @@ tokens are not affected.
   KPI and the gateway; the other apps keep 0.3.1 until they next sync (nothing they use changed).
 - `bin/dev-stack` runs the gateway (port 3070) in front of the Logs Analyzer's and KPI's MCP servers
   (docs/local-testing.md).
+- **Outside Tourpaq Auth** (13 Nov 2026): app `gitbook` (GitBook, MCP only, roles `viewer`, `editor`, `admin`, no
+  client) only decides who may use GitBook's MCP server through the gateway. GitBook never sees our tokens: the gateway
+  calls it with its own GitBook account and gives `viewer` the read tools, `editor` and `admin` (with a `read_write`
+  token) also the tools that change content (the gateway's SPECS.md §6d).
 
 ### 25.7 The config API: this app's configuration for its admins, through the gateway (5 Nov 2026)
 
